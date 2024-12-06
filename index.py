@@ -352,7 +352,7 @@ class ActionRequest(Body):
 class ActionItemsRequest(Body):
     action_items: str
     emails: List[str]
-    meeting_summary: Optional[ str ] = None
+    meeting_summary: Optional[str] = None
 
 
 @app.post("/generate_actions")
