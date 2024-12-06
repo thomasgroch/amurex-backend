@@ -357,7 +357,7 @@ class ActionItemsRequest(Body):
 
 @app.post("/generate_actions")
 async def generate_actions(request, body: ActionRequest):
-    data = request.json()
+    data = json.loads(body)
     transcript = data["transcript"]
     cache_key = get_cache_key(transcript)
     
@@ -386,13 +386,14 @@ async def generate_actions(request, body: ActionRequest):
 
 
 @app.post("/submit")
-async def submit(request, body: ActionItemsRequest):
-    data = request.json()
+async def submit(request: Request, body: ActionItemsRequest):
+    data = json.loads(body)
     action_items = data["action_items"]
     meeting_summary = data["meeting_summary"]
     
     # notion_url = create_note(notes_content)
     emails = data["emails"]
+    print(emails, type(emails), data)
     successful_emails = send_email(emails, action_items, meeting_summary)
 
     if successful_emails["type"] == "error":
