@@ -569,15 +569,39 @@ def check_suggestion(request_dict):
 @websocket.on("connect")
 async def on_connect(ws, msg):
     meeting_id = ws.query_params.get("meeting_id")
+    user_id = ws.query_params.get("user_id")
 
     primary_user_key = f"primary_user:{meeting_id}"
     if not redis_client.exists(primary_user_key):
         redis_client.set(primary_user_key, ws.id)
 
+        # Create new meeting metric entry when first user connects
+        if user_id is not None:
+            result = supabase.table("late_meeting").insert({
+                "meeting_id": meeting_id,
+                "user_ids": [user_id],
+                "meeting_start_time": time.time()
+            }).execute()
+    else:
+        # Update existing meeting entry to add new user
+        if user_id is not None:
+            user_ids = supabase.table("late_meeting").select("user_ids").eq("meeting_id", meeting_id).execute().data;
+            if user_ids:
+                user_ids = user_ids[0]["user_ids"]
+            else:
+                user_ids = []
+            new_user_ids = set(user_ids + [user_id])
+            # Using raw SQL to append to array
+            result = supabase.table("late_meeting")\
+                .update({"user_ids": list(new_user_ids)}, count="exact")\
+                .eq("meeting_id", meeting_id)\
+                .execute()
+
     if not redis_client.exists(f"meeting:{meeting_id}"):
         redis_client.set(f"meeting:{meeting_id}", "")
 
     return ""
+
 
 
 @websocket.on("message")
