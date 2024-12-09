@@ -29,7 +29,6 @@ sentry_sdk.init(
     traces_sample_rate=1.0,
 )
 
-sentry_sdk.profiler.start_profiler()
 load_dotenv()
 
 
