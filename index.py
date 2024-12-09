@@ -670,6 +670,9 @@ async def close(ws, msg):
 @app.get("/late_summary/:meeting_id")
 async def get_late_summary(path_params):
     meeting_id = path_params["meeting_id"]
+    if meeting_id == "undefined":
+        return {"late_summary": ""}
+
     transcript = redis_client.get(f"meeting:{meeting_id}")
     late_summary = generate_notes(transcript)
 
