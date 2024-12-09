@@ -484,7 +484,7 @@ def check_suggestion(request_dict):
                 "type": "no_file_found"
                 }
 
-        if int(sb_response["suggestion_count"]) >= 10:
+        if int(sb_response["suggestion_count"]) >= 3:
             return {
                 "files_found": True,
                 "generated_suggestion": None,
