@@ -65,7 +65,6 @@ SUPABASE_ANON_KEY=your_anon_key
 REDIS_USERNAME=your_redis_username
 REDIS_URL=your_redis_host
 REDIS_PASSWORD=your_redis_password
-PPLX_API_KEY=your_perplexity_key
 ```
 
 ## Installation
