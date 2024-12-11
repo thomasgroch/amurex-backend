@@ -46,7 +46,8 @@ class AIClientAdapter:
             "gpt-4o": "llama3.2"
         }
         groq = {
-            "llama3.2": "llama3-70b-8192"
+            "llama-3.3": "llama-3.3-70b-versatile",
+            "llama-3.2": "llama3-70b-8192"
         }
         if self.client_mode == "LOCAL":
             # Use Ollama client
@@ -449,120 +450,131 @@ def generate_realtime_suggestion(context, transcript):
     ]
 
     response = ai_client.chat_completions_create(
-        model="llama3.2",
+        model="llama-3.3",
         messages=messages,
         temperature=0
     )
 
-    response = response
-
     return response
 
 
-def check_suggestion(request_dict):
+def check_suggestion(request_dict): 
     try:
         transcript = request_dict["transcript"]
         meeting_id = request_dict["meeting_id"]
         user_id = request_dict["user_id"]
+        is_file_uploaded = request_dict.get("isFileUploaded", None)
 
-        sb_response = supabase.table("meetings").select("context_files, embeddings, chunks, suggestion_count").eq("meeting_id", meeting_id).eq("user_id", user_id).execute().data
+        if is_file_uploaded:
+            sb_response = supabase.table("meetings").select("context_files, embeddings, chunks, suggestion_count").eq("meeting_id", meeting_id).eq("user_id", user_id).execute().data
 
-        if not sb_response:
-            return {
-                "files_found": False,
-                "generated_suggestion": None,
-                "last_question": None,
-                "type": "no_record_found"
+            if not sb_response:
+                return {
+                    "files_found": False,
+                    "generated_suggestion": None,
+                    "last_question": None,
+                    "type": "no_record_found"
+                    }
+            
+            sb_response = sb_response[0]
+            if not sb_response["context_files"] or not sb_response["chunks"]:
+                return {
+                    "files_found": False,
+                    "generated_suggestion": None,
+                    "last_question": None,
+                    "type": "no_file_found"
+                    }
+
+            if int(sb_response["suggestion_count"]) == 4:
+                return {
+                    "files_found": True,
+                    "generated_suggestion": None,
+                    "last_question": None,
+                    "type": "exceeded_response"
                 }
-        
-        sb_response = sb_response[0]
-        if not sb_response["context_files"] or not sb_response["chunks"]:
-            return {
-                "files_found": False,
-                "generated_suggestion": None,
-                "last_question": None,
-                "type": "no_file_found"
+            
+            file_chunks = sb_response["chunks"]
+            embedded_chunks = sb_response["embeddings"]
+            embedded_chunks = [parse_array_string(item) for item in embedded_chunks]
+
+            messages_list = [
+                {
+                    "role": "system",
+                    "content": """You are a personal online meeting copilot, and your task is to detect if a speaker needs help during a call. 
+
+                        Possible cases when user needs help in real time:
+                        - They need to recall something from their memory (e.g. 'what was the company you told us about 3 weeks ago?')
+                        - They need to recall something from files or context they have prepared for the meeting (we are able handle the RAG across their documents)
+
+                        If the user was not asked a question or is not trying to recall something, then they don't need any help or suggestions.
+                        
+                        You have to identify if they need help based on the call transcript,
+                        If your user has already answered the question, there is no need to help.
+                        If the last sentence in the transcript was a question, then your user probably needs help. If it's not a question, then don't.
+                        
+                        You are strictly required to follow this JSON structure:
+                        {"needs_help":true/false, "last_question": json null or the last question}
+                    """
+                },
+                {
+                    "role": "user",
+                    "content": f"""
+                        Latest chunk from the transcript: {transcript}.
+                    """
                 }
+            ]
 
-        if int(sb_response["suggestion_count"]) >= 3:
-            return {
-                "files_found": True,
-                "generated_suggestion": None,
-                "last_question": None,
-                "type": "exceeded_response"
-            }
-        
-        file_chunks = sb_response["chunks"]
-        embedded_chunks = sb_response["embeddings"]
-        embedded_chunks = [parse_array_string(item) for item in embedded_chunks]
+            response = ai_client.chat_completions_create(
+                model="gpt-4o",
+                messages=messages_list,
+                temperature=0,
+                response_format={"type": "json_object"}
+            )
 
-        messages_list = [
-            {
-                "role": "system",
-                "content": """You are a personal online meeting copilot, and your task is to detect if a speaker needs help during a call. 
+            response_content = json.loads(response)
+            last_question = response_content["last_question"]
 
-                    Possible cases when user needs help in real time:
-                    - They need to recall something from their memory (e.g. 'what was the company you told us about 3 weeks ago?')
-                    - They need to recall something from files or context they have prepared for the meeting (we are able handle the RAG across their documents)
+            if 'needs_help' in response_content and response_content["needs_help"]:
+                embedded_query = embed_text(last_question)
+                closest_chunks = find_closest_chunk(query_embedding=embedded_query, chunks_embeddings=embedded_chunks, chunks=file_chunks)
 
-                    If the user was not asked a question or is not trying to recall something, then they don't need any help or suggestions.
-                    
-                    You have to identify if they need help based on the call transcript,
-                    If your user has already answered the question, there is no need to help.
-                    If the last sentence in the transcript was a question, then your user probably needs help. If it's not a question, then don't.
-                    
-                    You are strictly required to follow this JSON structure:
-                    {"needs_help":true/false, "last_question": json null or the last question}
-                """
-            },
-            {
-                "role": "user",
-                "content": f"""
-                    Latest chunk from the transcript: {transcript}.
-                """
-            }
-        ]
+                suggestion = generate_realtime_suggestion(context=closest_chunks, transcript=transcript)
 
-        response = ai_client.chat_completions_create(
-            model="gpt-4o",
-            messages=messages_list,
-            temperature=0,
-            response_format={"type": "json_object"}
-        )
+                result = supabase.table("meetings")\
+                        .update({"suggestion_count": int(sb_response["suggestion_count"]) + 1})\
+                        .eq("meeting_id", meeting_id)\
+                        .eq("user_id", user_id)\
+                        .execute()
 
-        response_content = json.loads(response)
-        last_question = response_content["last_question"]
-
-        if 'needs_help' in response_content and response_content["needs_help"]:
-            embedded_query = embed_text(last_question)
-            closest_chunks = find_closest_chunk(query_embedding=embedded_query, chunks_embeddings=embedded_chunks, chunks=file_chunks)
-
-            suggestion = generate_realtime_suggestion(context=closest_chunks, transcript=transcript)
-
-            result = supabase.table("meetings")\
-                .update({"suggestion_count": int(sb_response["suggestion_count"]) + 1})\
-                .eq("meeting_id", meeting_id)\
-                .eq("user_id", user_id)\
-                .execute()
-
-            return {
-                "files_found": True,
-                "generated_suggestion": suggestion,
-                "last_question": last_question,
-                "type": "suggestion_response"
-                }
+                return {
+                    "files_found": True,
+                    "generated_suggestion": suggestion,
+                    "last_question": last_question,
+                    "type": "suggestion_response"
+                    }
+            else:
+                return {
+                    "files_found": False,
+                    "generated_suggestion": None,
+                    "last_question": None,
+                    "type": "suggestion_response"
+                    }
         else:
+            # follow up question logic to be implemented
+            # print("no uploaded files")
             return {
                 "files_found": True,
                 "generated_suggestion": None,
                 "last_question": None,
-                "type": "suggestion_response"
+                "type": "no_file_uploaded"
                 }
+
+
     
     except ValueError as e:
         return {"error": str(e)}
     except Exception as e:
-        return {"error": "An unexpected error occurred. Please try again later."}
+        return {"error": f"An unexpected error occurred. Please try again later. bitch: {e}"}
 
 
 @websocket.on("connect")
@@ -639,7 +651,7 @@ async def on_message(ws, msg):
                     current_transcript = current_transcript.decode()
                 else:
                     current_transcript = ""
-                
+
                 updated_transcript = current_transcript + transcript
                 redis_client.setex(f"meeting:{meeting_id}", CACHE_EXPIRATION, updated_transcript)
 
