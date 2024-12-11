@@ -3,8 +3,7 @@ CREATE TABLE analytics (
     uuid TEXT NOT NULL,
     event_type TEXT NOT NULL,
     created_at timestamp with time zone default timezone('utc'::text, now()),
-    meeting_id TEXT,
-    FOREIGN KEY (meeting_id) REFERENCES late_meeting(meeting_id)
+    meeting_id TEXT
 );
 
 -- Create indexes for better query performance
