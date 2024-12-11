@@ -659,7 +659,6 @@ async def on_message(ws, msg):
 class TrackingRequest(Body):
     uuid: str
     event_type: str
-    created_at: str
     meeting_id: Optional[str] = None
 
 @app.post("/track")
