@@ -656,6 +656,34 @@ async def on_message(ws, msg):
 
     return ""
 
+class TrackingRequest(Body):
+    uuid: str
+    event_type: str
+    created_at: str
+    meeting_id: Optional[str] = None
+
+@app.post("/track")
+async def track(request: Request, body: TrackingRequest):
+    try:
+        data = json.loads(body)
+        uuid = data["uuid"]
+        event_type = data["event_type"]
+        meeting_id = data.get("meeting_id")
+
+        result = supabase.table("analytics").insert({
+            "uuid": uuid,
+            "event_type": event_type,
+            "meeting_id": meeting_id
+        }).execute()
+
+        return {"result": "success"}
+    except Exception as e:
+        capture_exception(e)  # Send error to Sentry
+        return Response(
+            status_code=500,
+            description=f"Error tracking event: {str(e)}",
+            headers={}
+        )
 
 @websocket.on("close")
 async def close(ws, msg):
