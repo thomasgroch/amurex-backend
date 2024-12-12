@@ -583,8 +583,9 @@ async def on_connect(ws, msg):
     user_id = ws.query_params.get("user_id")
 
     primary_user_key = f"primary_user:{meeting_id}"
-    if not redis_client.exists(primary_user_key):
-        redis_client.set(primary_user_key, ws.id)
+    try:
+        if not redis_client.exists(primary_user_key):
+            redis_client.set(primary_user_key, ws.id)
 
         # Create new meeting metric entry when first user connects
         if user_id is not None and user_id != "undefined":
@@ -593,20 +594,27 @@ async def on_connect(ws, msg):
                 "user_ids": [user_id],
                 "meeting_start_time": time.time()
             }).execute()
+    except Exception as e:
+        print(f"Error creating meeting metric entry: {e}")
+        return ""
     else:
         # Update existing meeting entry to add new user
-        if user_id is not None and user_id != "undefined":
-            user_ids = supabase.table("late_meeting").select("user_ids").eq("meeting_id", meeting_id).execute().data;
-            if user_ids:
-                user_ids = user_ids[0]["user_ids"]
-            else:
-                user_ids = []
-            new_user_ids = set(user_ids + [user_id])
-            # Using raw SQL to append to array
-            result = supabase.table("late_meeting")\
+        try:
+            if user_id is not None and user_id != "undefined":
+                user_ids = supabase.table("late_meeting").select("user_ids").eq("meeting_id", meeting_id).execute().data;
+                if user_ids:
+                    user_ids = user_ids[0]["user_ids"]
+                else:
+                    user_ids = []
+                new_user_ids = set(user_ids + [user_id])
+                # Using raw SQL to append to array
+                result = supabase.table("late_meeting")\
                 .update({"user_ids": list(new_user_ids)}, count="exact")\
                 .eq("meeting_id", meeting_id)\
                 .execute()
+        except Exception as e:
+            print(f"Error updating meeting entry: {e}")
+            return ""
 
     if not redis_client.exists(f"meeting:{meeting_id}"):
         redis_client.set(f"meeting:{meeting_id}", "")
