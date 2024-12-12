@@ -587,7 +587,7 @@ async def on_connect(ws, msg):
         redis_client.set(primary_user_key, ws.id)
 
         # Create new meeting metric entry when first user connects
-        if user_id is not None:
+        if user_id is not None and user_id != "undefined":
             result = supabase.table("late_meeting").insert({
                 "meeting_id": meeting_id,
                 "user_ids": [user_id],
@@ -595,7 +595,7 @@ async def on_connect(ws, msg):
             }).execute()
     else:
         # Update existing meeting entry to add new user
-        if user_id is not None:
+        if user_id is not None and user_id != "undefined":
             user_ids = supabase.table("late_meeting").select("user_ids").eq("meeting_id", meeting_id).execute().data;
             if user_ids:
                 user_ids = user_ids[0]["user_ids"]
