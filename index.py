@@ -244,7 +244,7 @@ def send_email_summary(list_emails, actions, meeting_summary = None):
 
 def send_email(email, email_type):
     url = "https://api.resend.com/emails"
-    resend_key = os.getenv("RESEND_API_KEY_NEW")
+    resend_key = os.getenv("RESEND_API_KEY")
     resend_email = os.getenv("RESEND_FOUNDERS_EMAIL")
 
     if not email:
