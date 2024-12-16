@@ -197,7 +197,7 @@ def generate_notes(transcript):
     return notes
 
 
-def send_email(list_emails, actions, meeting_summary = None):
+def send_email_summary(list_emails, actions, meeting_summary = None):
     url = "https://api.resend.com/emails"
     successful_emails = []
     resend_key = os.getenv("RESEND_API_KEY")
@@ -238,6 +238,68 @@ def send_email(list_emails, actions, meeting_summary = None):
                 return {"type": "error", "error": f"Error sending email to {email}: {response.text}", "emails": None}
             else:
                 successful_emails.append(email)
+
+    return {"type": "success", "error": None, "emails": successful_emails}
+
+
+def send_email(email, email_type):
+    url = "https://api.resend.com/emails"
+    resend_key = os.getenv("RESEND_API_KEY_NEW")
+    resend_email = os.getenv("RESEND_FOUNDERS_EMAIL")
+
+    if not email:
+        return {"error": "no email provided"}
+
+    if email_type == "signup":
+        html = """
+                <div>
+                    <div>
+                        <p><b>Hello there 👋</b></p>
+                    </div>
+                    <div>
+                        <p>First off, a big thank you for signing up for Amurex! We're excited to have you join our mission to create the world’s first AI meeting copilot – and eventually, your ultimate executive assistant.</p>
+
+                        <p>Amurex is on a mission to become the world’s first AI meeting copilot and ultimately your complete executive assistant. We’re thrilled to have you join us on this journey.</p>
+
+                        <p>As a quick heads-up, here’s what’s coming next:</p>
+                        <ul>
+                            <li>Sneak peeks into new features</li>
+                            <li>Early access opportunities</li>
+                            <li>Ways to share your feedback and shape the future of Amurex</li>
+                        </ul>
+
+                        <p>If you have any questions or just want to say hi, hit reply – we’re all ears! We’d love to talk to you. Or better yet, join our conversation on <a href="https://discord.gg/ftUdQsHWbY">Discord</a>.</p>
+
+                        <p>Thanks for being part of our growing community.</p>
+
+                        <p>Cheers,<br>Sanskar</p>
+                    </div>
+                    <div>
+                        <p>&copy; 2024 Amurex. All rights reserved.</p>
+                    </div>
+                </div>
+                """
+
+        subject = "Welcome to Amurex – We’re Glad You’re Here!"
+
+    payload = {
+        "from": resend_email,
+        "to": email,
+        "subject": subject,
+        "html": html
+    }
+
+    headers = {
+        "Authorization": f"Bearer {resend_key}",
+        "Content-Type": "application/json"
+    }
+
+    response = requests.request("POST", url, json=payload, headers=headers)
+
+    if response.status_code != 200:
+        return {"type": "error", "error": f"Error sending email to {email}: {response.text}", "emails": None}
+    else:
+        successful_emails.append(email)
 
     return {"type": "success", "error": None, "emails": successful_emails}
 
@@ -394,7 +456,7 @@ async def submit(request: Request, body: ActionItemsRequest):
     # notion_url = create_note(notes_content)
     emails = data["emails"]
     print(emails, type(emails), data)
-    successful_emails = send_email(emails, action_items, meeting_summary)
+    successful_emails = send_email_summary(emails, action_items, meeting_summary)
 
     if successful_emails["type"] == "error":
         return {
@@ -732,6 +794,20 @@ async def check_meeting(path_params):
     is_meeting = redis_client.exists(f"meeting:{meeting_id}")
 
     return {"is_meeting": is_meeting}
+    
+
+@app.post("/send_user_email")
+async def send_user_email(request):
+
+    email_type = json.loads(request.body).get("type")
+    user_email = json.loads(request.body).get("email")
+
+    if email_type == "signup":
+        send_email(user_email, email_type)
+    else:
+        print('oh no')
+
+    return ""
 
 
 @app.get("/health_check")
