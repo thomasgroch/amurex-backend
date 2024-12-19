@@ -56,8 +56,7 @@ You can find the SQL for this table in `supabase/migrations/20241201195715_meeti
 
 Create a `.env` file in the root directory with the following variables:
 
-```
-env
+```env
 OPENAI_API_KEY=your_openai_key
 GROQ_API_KEY=your_groq_key
 SUPABASE_URL=your_project_url
@@ -65,6 +64,11 @@ SUPABASE_ANON_KEY=your_anon_key
 REDIS_USERNAME=your_redis_username
 REDIS_URL=your_redis_host
 REDIS_PASSWORD=your_redis_password
+REDIS_PORT=your_redis_port
+MXBAI_API_KEY=your_mxbai_api_key
+RESEND_API_KEY=your_resend_api_key
+RESEND_NOREPLY=your_resend_noreply
+CLIENT_MODE=ONLINE #set LOCAL to run local Ollama instead of OpenAI and Groq API
 ```
 
 ## Installation
