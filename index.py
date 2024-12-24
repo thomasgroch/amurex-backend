@@ -168,7 +168,7 @@ def extract_action_items(transcript):
 
     # Sending the prompt to the AI model using chat completions
     response = ai_client.chat_completions_create(
-        model="llama-3.3",
+        model="gpt-4o",
         messages=messages,
         temperature=0.2,
         response_format={"type": "json_object"}
@@ -188,7 +188,7 @@ def generate_notes(transcript):
     ]
 
     response = ai_client.chat_completions_create(
-        model="llama-3.3",
+        model="gpt-4o",
         messages=messages,
         temperature=0.2
     )
@@ -512,7 +512,7 @@ def generate_realtime_suggestion(context, transcript):
     ]
 
     response = ai_client.chat_completions_create(
-        model="llama-3.3",
+        model="llama-3.2",
         messages=messages,
         temperature=0
     )
@@ -587,7 +587,7 @@ def check_suggestion(request_dict):
             ]
 
             response = ai_client.chat_completions_create(
-                model="llama-3.3",
+                model="llama-3.2",
                 messages=messages_list,
                 temperature=0,
                 response_format={"type": "json_object"}
