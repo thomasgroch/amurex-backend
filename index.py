@@ -1,4 +1,4 @@
-from robyn.robyn import  Request
+from robyn.robyn import Request
 from sklearn.metrics.pairwise import cosine_similarity
 from supabase import create_client, Client
 import supabase
@@ -664,43 +664,39 @@ async def on_connect(ws, msg):
     user_id = ws.query_params.get("user_id")
     logger.info(f"WebSocket connection request - meeting_id: {meeting_id}, user_id: {user_id}")
 
-    primary_user_key = f"primary_user:{meeting_id}"
-    try:
-        if not redis_client.exists(primary_user_key):
-            logger.info(f"Setting primary user for meeting {meeting_id}")
-            redis_client.set(primary_user_key, ws.id)
+    if not redis_client.exists(f"meeting:{meeting_id}"):
+        redis_client.set(f"meeting:{meeting_id}", "")
 
-        # Create new meeting metric entry when first user connects
-        if user_id is not None and user_id != "undefined":
-            result = supabase.table("late_meeting").insert({
-                "meeting_id": meeting_id,
-                "user_ids": [user_id],
-                "meeting_start_time": time.time()
-            }).execute()
-    except Exception as e:
-        logger.error(f"Error in WebSocket connection: {str(e)}", exc_info=True)
-        return ""
-    else:
-        # Update existing meeting entry to add new user
+    primary_user_key = f"primary_user:{meeting_id}"
+    if user_id is not None and user_id != "undefined":
         try:
-            if user_id is not None and user_id != "undefined":
-                user_ids = supabase.table("late_meeting").select("user_ids").eq("meeting_id", meeting_id).execute().data;
+            if not redis_client.exists(primary_user_key):
+                logger.info(f"Setting primary user for meeting {meeting_id}")
+                redis_client.set(primary_user_key, ws.id)
+
+                # Create new meeting metric entry when first user connects
+                result = supabase.table("late_meeting").insert({
+                        "meeting_id": meeting_id,
+                        "user_ids": [user_id],
+                        "meeting_start_time": time.time()
+                    }).execute()
+            else:
+                logger.info(f"Updating existing late_meeting ({meeting_id}) record to add new user ({user_id})")
+                # Update existing late_meeting record to add new user
+                user_ids = supabase.table("late_meeting").select("user_ids").eq("meeting_id", meeting_id).execute().data
                 if user_ids:
                     user_ids = user_ids[0]["user_ids"]
                 else:
                     user_ids = []
                 new_user_ids = set(user_ids + [user_id])
-                # Using raw SQL to append to array
+                
                 result = supabase.table("late_meeting")\
-                .update({"user_ids": list(new_user_ids)}, count="exact")\
-                .eq("meeting_id", meeting_id)\
-                .execute()
+                    .update({"user_ids": list(new_user_ids)}, count="exact")\
+                    .eq("meeting_id", meeting_id)\
+                    .execute()
         except Exception as e:
-            print(f"Error updating meeting entry: {e}")
+            logger.error(f"Error in WebSocket connection: {str(e)}", exc_info=True)
             return ""
-
-    if not redis_client.exists(f"meeting:{meeting_id}"):
-        redis_client.set(f"meeting:{meeting_id}", "")
 
     return ""
 
@@ -834,6 +830,53 @@ async def send_user_email(request):
         print('oh no')
 
     return ""
+
+
+@app.post("/update_meeting_obj")
+async def update_meeting_obj(request):
+    json_body = json.loads(request.body)
+    transcript = json_body.get("transcript")
+    meeting_obj_id = json_body.get("meeting_obj_id")
+    summary = json_body.get("summary")
+    action_items = json_body.get("action_items")
+
+    supabase_update_object = {}
+
+    if not action_items:
+        action_items = extract_action_items(transcript)
+        supabase_update_object["action_items"] = action_items
+
+    if not summary:
+        summary = generate_notes(transcript)
+        supabase_update_object["summary"] = summary
+
+    if transcript:
+        unique_filename = f"{uuid.uuid4()}.txt"
+        file_contents = transcript
+        file_bytes = file_contents.encode('utf-8')
+        
+        storage_response = supabase.storage.from_("transcripts").upload(
+            path=unique_filename,
+            file=file_bytes,
+        )
+        file_url = supabase.storage.from_("transcripts").get_public_url(unique_filename)
+        
+        supabase_update_object["transcript"] = file_url
+
+    result = supabase.table("late_meeting")\
+                .update(supabase_update_object)\
+                .eq("id", meeting_obj_id)\
+                .execute()
+
+    return {"status": "ok"}
+
+
+@app.post("/get_transcripts")
+async def get_transcripts(request):
+    json_body = json.loads(request.body)
+    print(json_body)
+
+    return {"status": "ok"}
 
 
 @app.get("/health_check")
