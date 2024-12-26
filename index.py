@@ -306,11 +306,9 @@ def send_email(email, email_type):
     response = requests.request("POST", url, json=payload, headers=headers)
 
     if response.status_code != 200:
-        return {"type": "error", "error": f"Error sending email to {email}: {response.text}", "emails": None}
-    else:
-        successful_emails.append(email)
+        return {"type": "error", "error": f"Error sending email to {email}: {response.text}"}
 
-    return {"type": "success", "error": None, "emails": successful_emails}
+    return {"type": "success", "error": None}
 
 
 def extract_text(file_path):
