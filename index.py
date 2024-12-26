@@ -644,42 +644,44 @@ async def on_connect(ws, msg):
     meeting_id = ws.query_params.get("meeting_id")
     user_id = ws.query_params.get("user_id")
 
+    if not redis_client.exists(f"meeting:{meeting_id}"):
+        redis_client.set(f"meeting:{meeting_id}", "")
+
     primary_user_key = f"primary_user:{meeting_id}"
     try:
-        if not redis_client.exists(primary_user_key):
-            redis_client.set(primary_user_key, ws.id)
-
-        # Create new meeting metric entry when first user connects
         if user_id is not None and user_id != "undefined":
-            result = supabase.table("late_meeting").insert({
-                "meeting_id": meeting_id,
-                "user_ids": [user_id],
-                "meeting_start_time": time.time()
-            }).execute()
-    except Exception as e:
-        print(f"Error creating meeting metric entry: {e}")
-        return ""
-    else:
-        # Update existing meeting entry to add new user
-        try:
-            if user_id is not None and user_id != "undefined":
-                user_ids = supabase.table("late_meeting").select("user_ids").eq("meeting_id", meeting_id).execute().data;
+            if not redis_client.exists(primary_user_key):
+                print(f"no primary user yet")
+                redis_client.set(primary_user_key, ws.id)
+
+                print(f"set a primary user: {primary_user_key}")
+
+                # Create new meeting metric entry when first user connects
+                result = supabase.table("late_meeting").insert({
+                    "meeting_id": meeting_id,
+                    "user_ids": [user_id],
+                    "meeting_start_time": time.time()
+                }).execute()
+            else:
+                print(f"found a primary user: {primary_user_key}")
+                user_ids = supabase.table("late_meeting").select("user_ids").eq("meeting_id", meeting_id).execute().data
+
                 if user_ids:
                     user_ids = user_ids[0]["user_ids"]
+                    print(f"user ids: {user_ids}")
                 else:
                     user_ids = []
                 new_user_ids = set(user_ids + [user_id])
-                # Using raw SQL to append to array
-                result = supabase.table("late_meeting")\
-                .update({"user_ids": list(new_user_ids)}, count="exact")\
-                .eq("meeting_id", meeting_id)\
-                .execute()
-        except Exception as e:
-            print(f"Error updating meeting entry: {e}")
-            return ""
 
-    if not redis_client.exists(f"meeting:{meeting_id}"):
-        redis_client.set(f"meeting:{meeting_id}", "")
+                # Update the late_meeting record
+                result = supabase.table("late_meeting")\
+                    .update({"user_ids": list(new_user_ids)}, count="exact")\
+                    .eq("meeting_id", meeting_id)\
+                    .execute()
+
+    except Exception as e:
+        print(f"Error creating meeting metric entry: {e}")
+        return ""
 
     return ""
 
@@ -707,7 +709,6 @@ async def on_message(ws, msg):
             
             if not redis_client.exists(primary_user_key):
                 redis_client.set(primary_user_key, ws.id)
-
 
             if redis_client.get(primary_user_key).decode() == ws.id:
                 # Safely access transcript data
