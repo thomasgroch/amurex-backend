@@ -666,7 +666,7 @@ async def on_connect(ws, msg):
         redis_client.set(f"meeting:{meeting_id}", "")
 
     primary_user_key = f"primary_user:{meeting_id}"
-    if user_id is not None and user_id != "undefined":
+    if user_id is not None and user_id != "undefined" and user_id != "null":
         try:
             if not redis_client.exists(primary_user_key):
                 logger.info(f"Setting primary user for meeting {meeting_id}")
