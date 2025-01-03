@@ -673,11 +673,11 @@ async def on_connect(ws, msg):
                 redis_client.set(primary_user_key, ws.id)
 
                 # Create new meeting metric entry when first user connects
-                result = supabase.table("late_meeting").insert({
+                result = supabase.table("late_meeting").upsert({
                         "meeting_id": meeting_id,
                         "user_ids": [user_id],
                         "meeting_start_time": time.time()
-                    }).execute()
+                    }, on_conflict="meeting_id").execute()
             else:
                 logger.info(f"Updating existing late_meeting ({meeting_id}) record to add new user ({user_id})")
                 # Update existing late_meeting record to add new user
