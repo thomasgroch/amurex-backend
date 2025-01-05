@@ -520,7 +520,8 @@ async def end_meeting(request, body: EndMeetingRequest):
         if not meeting_obj:
             result = supabase.table("late_meeting").upsert({
                     "meeting_id": meeting_id,
-                    "user_ids": [user_id]
+                    "user_ids": [user_id],
+                    "meeting_start_time": time.time()
                 }, on_conflict="meeting_id").execute()
 
             meeting_obj_transcript_exists = None
@@ -830,25 +831,38 @@ async def on_connect(ws, msg):
     user_id = ws.query_params.get("user_id")
     logger.info(f"WebSocket connection request - meeting_id: {meeting_id}, user_id: {user_id}")
 
-    if not redis_client.exists(f"meeting:{meeting_id}"):
-        redis_client.set(f"meeting:{meeting_id}", "")
+    try:
+        if not redis_client.exists(f"meeting:{meeting_id}"):
+            redis_client.set(f"meeting:{meeting_id}", "")
+    except Exception as e:
+        logger.error(f"Error in setting meeting:{meeting_id} in Redis: {str(e)}", exc_info=True)
+        pass
 
     primary_user_key = f"primary_user:{meeting_id}"
     if user_id is not None and user_id != "undefined" and user_id != "null":
-        try:
-            if not redis_client.exists(primary_user_key):
-                logger.info(f"Setting primary user for meeting {meeting_id}")
+        if not redis_client.exists(primary_user_key):
+            logger.info(f"Setting primary user for meeting {meeting_id}")
+            try:
                 redis_client.set(primary_user_key, ws.id)
+            except Exception as e:
+                logger.error(f"Error in setting primary_user:{meeting_id}: {str(e)}", exc_info=True)
+                pass
 
+            try:
                 # Create new meeting metric entry when first user connects
                 result = supabase.table("late_meeting").upsert({
                         "meeting_id": meeting_id,
                         "user_ids": [user_id],
                         "meeting_start_time": time.time()
                     }, on_conflict="meeting_id").execute()
-            else:
-                logger.info(f"Updating existing late_meeting ({meeting_id}) record to add new user ({user_id})")
-                # Update existing late_meeting record to add new user
+            except Exception as e:
+                logger.error(f"Error in creating new late_meeting ({meeting_id}) record: {str(e)}", exc_info=True)
+                pass
+        else:
+            logger.info(f"Updating existing late_meeting ({meeting_id}) record to add new user ({user_id})")
+            
+            # Update existing late_meeting record to add new user
+            try:
                 user_ids = supabase.table("late_meeting").select("user_ids").eq("meeting_id", meeting_id).execute().data
                 if user_ids:
                     user_ids = user_ids[0]["user_ids"]
@@ -860,12 +874,11 @@ async def on_connect(ws, msg):
                     .update({"user_ids": list(new_user_ids)}, count="exact")\
                     .eq("meeting_id", meeting_id)\
                     .execute()
-        except Exception as e:
-            logger.error(f"Error in WebSocket connection: {str(e)}", exc_info=True)
-            return ""
+            except Exception as e:
+                logger.error(f"Error in updating existing late_meeting ({meeting_id}) record: {str(e)}", exc_info=True)
+                pass
 
     return ""
-
 
 
 @websocket.on("message")
