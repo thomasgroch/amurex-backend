@@ -497,7 +497,10 @@ async def end_meeting(request, body: EndMeetingRequest):
     transcript = data["transcript"]
     cache_key = get_cache_key(transcript)
 
-    if not "meeting_id" in data or not "user_id" in data:
+    if not "meeting_id" in data:
+        if not "user_id" in data:
+            return None
+        
         action_items = extract_action_items(transcript)
         notes_content = generate_notes(transcript)
         
@@ -505,6 +508,7 @@ async def end_meeting(request, body: EndMeetingRequest):
             "notes_content": notes_content,
             "actions_items": action_items
         }
+    
 
     user_id = data["user_id"]
     meeting_id = data["meeting_id"]
@@ -513,6 +517,15 @@ async def end_meeting(request, body: EndMeetingRequest):
 
     if is_memory_enabled is True:
         meeting_obj = supabase.table("late_meeting").select("id, transcript").eq("meeting_id", meeting_id).execute().data
+        if not meeting_obj:
+            result = supabase.table("late_meeting").upsert({
+                    "meeting_id": meeting_id,
+                    "user_ids": [user_id]
+                }, on_conflict="meeting_id").execute()
+
+            meeting_obj_transcript_exists = None
+            meeting_obj_id = result.data[0]["id"]
+
         meeting_obj_transcript_exists = meeting_obj[0]["transcript"] # None or str url
         meeting_obj_id = meeting_obj[0]["id"]
 
@@ -574,6 +587,14 @@ async def end_meeting(request, body: EndMeetingRequest):
                 "action_items": memory_obj["action_items"],
                 "notes_content": memory_obj["notes_content"]
             }
+    else:
+        action_items = extract_action_items(transcript)
+        notes_content = generate_notes(transcript)
+        
+        return {
+            "notes_content": notes_content,
+            "actions_items": action_items
+        }
 
 
 @app.post("/generate_actions")
