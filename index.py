@@ -192,7 +192,7 @@ def generate_notes(transcript):
         {
             "role": "user",
             "content": f"""You are an executive assistant tasked with taking notes from an online meeting transcript.
-                Transcript: {transcript}"""
+                Full transcript: {transcript}"""
         }
     ]
 
@@ -204,6 +204,25 @@ def generate_notes(transcript):
 
     notes = response
     return notes
+
+
+def generate_title(summary):
+    messages = [
+        {
+            "role": "user",
+            "content": f"""You are an executive assistant tasked with generating titles for meetings based on the meeting summaries.
+                Full summary: {summary}"""
+        }
+    ]
+
+    response = ai_client.chat_completions_create(
+        model="gpt-4o",
+        messages=messages,
+        temperature=0.2
+    )
+
+    title = response
+    return title
 
 
 def send_email_summary(list_emails, actions, meeting_summary = None):
@@ -342,6 +361,10 @@ def embed_text(text):
     return embeddings
 
 
+def calc_centroid(embeddings):
+    return np.mean(embeddings, axis=0)
+
+
 @app.post("/upload_meeting_file/:meeting_id/:user_id/")
 async def upload_meeting_file(request):
     meeting_id = request.path_params.get("meeting_id")
@@ -423,10 +446,131 @@ class ActionRequest(Body):
     transcript: str
 
 
+class EndMeetingRequest(Body):
+    transcript: str
+    user_id: str
+    meeting_id: str
+
+
 class ActionItemsRequest(Body):
     action_items: str
     emails: List[str]
     meeting_summary: Optional[str] = None
+
+
+def create_memory_object(user_id, meeting_id, transcript, cache_key):
+    # Try to get from cache
+    cached_result = redis_client.get(cache_key)
+    if cached_result:
+        logger.info("Retrieved result from cache")
+        return json.loads(cached_result)
+    
+    logger.info("Cache miss - generating new results")
+    
+    # Generate new results if not in cache
+    action_items = extract_action_items(transcript)
+    notes_content = generate_notes(transcript)
+    title = generate_title(notes_content)
+    
+    result = {
+        "action_items": action_items,
+        "notes_content": notes_content,
+        "title": title
+    }
+    
+    # Cache the result
+    redis_client.setex(
+        cache_key,
+        CACHE_EXPIRATION,
+        json.dumps(result)
+    )
+    
+    return result
+
+
+@app.post("/end_meeting")
+async def end_meeting(request, body: EndMeetingRequest):
+    data = json.loads(body)
+    transcript = data["transcript"]
+    cache_key = get_cache_key(transcript)
+
+    if not "meeting_id" in data or not "user_id" in data:
+        action_items = extract_action_items(transcript)
+        notes_content = generate_notes(transcript)
+        
+        return {
+            "notes_content": notes_content,
+            "actions_items": action_items
+        }
+
+    user_id = data["user_id"]
+    meeting_id = data["meeting_id"]
+
+    is_memory_enabled = supabase.table("users").select("memory_enabled").eq("id", user_id).execute().data[0]["memory_enabled"]
+
+    if is_memory_enabled is True:
+        meeting_obj = supabase.table("late_meeting").select("id, transcript").eq("meeting_id", meeting_id).execute().data
+        meeting_obj_transcript_exists = meeting_obj[0]["transcript"] # None or str url
+        meeting_obj_id = meeting_obj[0]["id"]
+
+        if not meeting_obj_transcript_exists:
+            unique_filename = f"{uuid.uuid4()}.txt"
+            file_contents = transcript
+            file_bytes = file_contents.encode('utf-8')
+            
+            storage_response = supabase.storage.from_("transcripts").upload(
+                path=unique_filename,
+                file=file_bytes,
+            )
+            file_url = supabase.storage.from_("transcripts").get_public_url(unique_filename)
+            
+            result = supabase.table("late_meeting")\
+                    .update({"transcript": file_url})\
+                    .eq("id", meeting_obj_id)\
+                    .execute()
+
+        memory = supabase.table("memories").select("*").eq("meeting_id", meeting_obj_id).execute().data
+
+        if memory:
+            if memory[0]["content"] and "ACTION_ITEMS" in memory[0]["content"]:
+                summary = memory[0]["content"].split("DIVIDER")[0]
+                action_items = memory[0]["content"].split("DIVIDER")[1]
+
+                result = {
+                    "action_items": action_items,
+                    "notes_content": notes_content
+                }
+
+                return result
+        else:
+            memory_obj = create_memory_object(user_id=user_id, meeting_id=meeting_id, transcript=transcript, cache_key=cache_key)
+
+            content = memory_obj["notes_content"] + memory_obj["action_items"]
+            content_chunks = get_chunks(content)
+            embeddings = [embed_text(chunk) for chunk in content_chunks]
+            centroid = str(calc_centroid(np.array(embeddings)).tolist())
+            embeddings = list(map(str, embeddings))
+            content = memory_obj["notes_content"] + f"\nDIVIDER\n" + memory_obj["action_items"]
+            title = memory_obj["title"]
+
+            supabase.table("memories").insert({
+                    "user_id": user_id,
+                    "meeting_id": meeting_obj_id,
+                    "content": content,
+                    "chunks": content_chunks,
+                    "embeddings": embeddings,
+                    "centroid": centroid,
+                }).execute()
+
+            supabase.table("late_meeting")\
+                .update({"summary": memory_obj["notes_content"], "action_items": memory_obj["action_items"], "meeting_title": title})\
+                .eq("id", meeting_obj_id)\
+                .execute()
+
+            return {
+                "action_items": memory_obj["action_items"],
+                "notes_content": memory_obj["notes_content"]
+            }
 
 
 @app.post("/generate_actions")
@@ -666,18 +810,18 @@ async def on_connect(ws, msg):
         redis_client.set(f"meeting:{meeting_id}", "")
 
     primary_user_key = f"primary_user:{meeting_id}"
-    if user_id is not None and user_id != "undefined":
+    if user_id is not None and user_id != "undefined" and user_id != "null":
         try:
             if not redis_client.exists(primary_user_key):
                 logger.info(f"Setting primary user for meeting {meeting_id}")
                 redis_client.set(primary_user_key, ws.id)
 
                 # Create new meeting metric entry when first user connects
-                result = supabase.table("late_meeting").insert({
+                result = supabase.table("late_meeting").upsert({
                         "meeting_id": meeting_id,
                         "user_ids": [user_id],
                         "meeting_start_time": time.time()
-                    }).execute()
+                    }, on_conflict="meeting_id").execute()
             else:
                 logger.info(f"Updating existing late_meeting ({meeting_id}) record to add new user ({user_id})")
                 # Update existing late_meeting record to add new user
@@ -869,10 +1013,8 @@ async def update_meeting_obj(request):
     return {"status": "ok"}
 
 
-@app.post("/get_transcripts")
-async def get_transcripts(request):
-    json_body = json.loads(request.body)
-    print(json_body)
+@app.get("/get_history")
+async def get_history(request):
 
     return {"status": "ok"}
 
