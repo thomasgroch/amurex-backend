@@ -266,30 +266,29 @@ def send_email(email, email_type):
                         <p><b>Hello there 👋</b></p>
                     </div>
                     <div>
-                        <p>First off, a big thank you for signing up for Amurex! We're excited to have you join our mission to create the world’s first AI meeting copilot – and eventually, your ultimate executive assistant.</p>
+                        <p>First off, a big thank you for signing up for Amurex! We're excited to have you join our mission to create the world's first AI meeting copilot.</p>
 
-                        <p>Amurex is on a mission to become the world’s first AI meeting copilot and ultimately your complete executive assistant. We’re thrilled to have you join us on this journey.</p>
+                        <p>Amurex is on a mission to become the world's first AI meeting copilot and ultimately your complete executive assistant. We're thrilled to have you join us on this journey.</p>
 
-                        <p>As a quick heads-up, here’s what’s coming next:</p>
+                        <p>As a quick heads-up, here's what's coming next:</p>
                         <ul>
                             <li>Sneak peeks into new features</li>
                             <li>Early access opportunities</li>
                             <li>Ways to share your feedback and shape the future of Amurex</li>
                         </ul>
 
-                        <p>If you have any questions or just want to say hi, hit reply – we’re all ears! We’d love to talk to you. Or better yet, join our conversation on <a href="https://discord.gg/ftUdQsHWbY">Discord</a>.</p>
+                        <p>Want to learn more about how Amurex can help you? <a href="https://cal.com/founders-the-personal-ai-company/15min" >Just Book a Demo →</a></p>
+
+                        <p>If you have any questions or just want to say hi, hit reply – we're all ears! We'd love to talk to you. Or better yet, join our conversation on <a href="https://discord.gg/ftUdQsHWbY">Discord</a>.</p>
 
                         <p>Thanks for being part of our growing community.</p>
 
-                        <p>Cheers,<br>Sanskar</p>
-                    </div>
-                    <div>
-                        <p>&copy; 2024 Amurex. All rights reserved.</p>
+                        <p>Cheers,<br>Sanskar 🦖</p>
                     </div>
                 </div>
                 """
 
-        subject = "Welcome to Amurex – We’re Glad You’re Here!"
+        subject = "Welcome to Amurex – We're Glad You're Here!"
 
     payload = {
         "from": resend_email,
