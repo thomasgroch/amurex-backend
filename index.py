@@ -274,7 +274,7 @@ def send_email_summary(list_emails, actions, meeting_summary = None):
     return {"type": "success", "error": None, "emails": successful_emails}
 
 
-def send_email(email, email_type):
+def send_email(email, email_type, **kwargs):
     url = "https://api.resend.com/emails"
     resend_key = os.getenv("RESEND_API_KEY")
     resend_email = os.getenv("RESEND_FOUNDERS_EMAIL")
@@ -312,6 +312,32 @@ def send_email(email, email_type):
                 """
 
         subject = "Welcome to Amurex – We're Glad You're Here!"
+    
+    elif email_type == "meeting_share":
+        share_url = kwargs['share_url']
+        meeting_obj_id = kwargs['meeting_obj_id']
+        html = f"""someone shared their meeting notes with you: {share_url}"""
+        resend_email = os.getenv("RESEND_NOREPLY")
+        subject = "Someone shared their notes with you | Amurex"
+
+        shared_emails = supabase.table("late_meeting")\
+            .select("shared_with")\
+            .eq("id", meeting_obj_id)\
+            .execute().data[0]["shared_with"]
+
+        if shared_emails:
+            if email not in shared_emails:
+                result = supabase.table("late_meeting")\
+                    .update({"shared_with": shared_emails + [email]})\
+                    .eq("id", meeting_obj_id)\
+                    .execute()
+            else:
+                return ""
+        else:
+            result = supabase.table("late_meeting")\
+                .update({"shared_with": [email]})\
+                .eq("id", meeting_obj_id)\
+                .execute()
 
     payload = {
         "from": resend_email,
@@ -1005,8 +1031,12 @@ async def send_user_email(request):
 
     if email_type == "signup":
         send_email(user_email, email_type)
+    elif email_type == "meeting_share":
+        share_url = json.loads(request.body).get("share_url")
+        meeting_obj_id = json.loads(request.body).get("meeting_id")
+        send_email(email=user_email, email_type=email_type, share_url=share_url, meeting_obj_id=meeting_obj_id)
     else:
-        print('oh no')
+        logger.info('oh no')
 
     return ""
 
