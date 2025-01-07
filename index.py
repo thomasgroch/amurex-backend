@@ -525,7 +525,11 @@ async def end_meeting(request, body: EndMeetingRequest):
 
     if not "meeting_id" in data:
         if not "user_id" in data:
-            return None
+            return {
+                # this is our problem
+                "notes_content": generate_notes(transcript),
+                "actions_items": extract_action_items(transcript)
+            }
         
         action_items = extract_action_items(transcript)
         notes_content = generate_notes(transcript)
