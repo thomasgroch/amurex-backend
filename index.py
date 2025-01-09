@@ -519,18 +519,25 @@ def create_memory_object(user_id, meeting_id, transcript, cache_key):
 
 @app.post("/end_meeting")
 async def end_meeting(request, body: EndMeetingRequest):
+    # the logic here could be simplified as well
+    # TODO: simplify the logic
     data = json.loads(body)
     transcript = data["transcript"]
     cache_key = get_cache_key(transcript)
+    user_id = data.get("user_id", None)
+    meeting_id = data.get("meeting_id", None)
 
-    if not "meeting_id" in data:
-        if not "user_id" in data:
-            return {
-                # this is our problem
-                "notes_content": generate_notes(transcript),
-                "actions_items": extract_action_items(transcript)
-            }
-        
+
+    if not user_id:
+        # this is a temporary fix for the issue
+        # we need to fix this in the future
+        # TODO: figure out why tf are we not sending user_id from the chrome extension
+        return {
+            "notes_content": generate_notes(transcript),
+            "actions_items": extract_action_items(transcript)
+        }
+    
+    if not meeting_id:
         action_items = extract_action_items(transcript)
         notes_content = generate_notes(transcript)
         
@@ -539,10 +546,7 @@ async def end_meeting(request, body: EndMeetingRequest):
             "actions_items": action_items
         }
     
-
-    user_id = data["user_id"]
-    meeting_id = data["meeting_id"]
-
+    
     is_memory_enabled = supabase.table("users").select("memory_enabled").eq("id", user_id).execute().data[0]["memory_enabled"]
 
     if is_memory_enabled is True:
