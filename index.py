@@ -936,11 +936,9 @@ async def on_message(ws, msg):
             meeting_key = f"meeting:{meeting_id}"
             
             try:
-                # Use pipeline for primary user check and set
-                pipe = redis_client.pipeline()
-                pipe.exists(primary_user_key)
-                pipe.get(primary_user_key)
-                exists, primary_user = pipe.execute()
+                # Check if primary user exists and get value
+                exists = redis_client.exists(primary_user_key)
+                primary_user = redis_client.get(primary_user_key) if exists else None
 
                 if not exists:
                     redis_client.set(primary_user_key, ws.id)
@@ -952,11 +950,9 @@ async def on_message(ws, msg):
                 if not is_primary or data is None:
                     return ""
 
-                # Use pipeline for transcript operations
-                pipe = redis_client.pipeline()
-                pipe.get(meeting_key)
-                pipe.exists(meeting_key)
-                current_transcript, exists = pipe.execute()
+                # Get current transcript
+                current_transcript = redis_client.get(meeting_key)
+                exists = redis_client.exists(meeting_key)
 
                 # Combine existing and new transcript
                 updated_transcript = (current_transcript.decode() if exists else "") + data
@@ -970,12 +966,9 @@ async def on_message(ws, msg):
 
                 logger.debug(f"Successfully updated transcript for meeting {meeting_id}")
 
-            except redis.RedisError as e:
-                logger.error(f"Redis error during transcript update: {str(e)}", exc_info=True)
-                capture_exception(e)
             except Exception as e:
-                logger.error(f"Unexpected error during transcript update: {str(e)}", exc_info=True)
-                capture_exception(e)
+                logger.error(f"Error in updating transcript: {str(e)}", exc_info=True)
+                return ""
 
         elif type_ == "check_suggestion":
             data["meeting_id"] = meeting_id
