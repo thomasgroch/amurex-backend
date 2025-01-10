@@ -135,7 +135,16 @@ redis_host = os.getenv("REDIS_URL")
 redis_password = os.getenv("REDIS_PASSWORD")
 redis_port = int(os.getenv("REDIS_PORT"))
 redis_url = f"rediss://{redis_user}:{redis_password}@{redis_host}:{redis_port}"
-redis_client = redis.Redis.from_url(redis_url)
+redis_client = redis.Redis.from_url(
+    redis_url,
+    decode_responses=True,
+    socket_timeout=5,
+    socket_connect_timeout=5,
+    socket_keepalive=True,
+    health_check_interval=30,
+    retry_on_timeout=True,
+    max_connections=250  # this is the max number of connections to the redis server
+)
 CACHE_EXPIRATION = 60 * 60 * 24  # 24 hours in seconds
 
 
