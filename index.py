@@ -20,8 +20,6 @@ from io import BytesIO
 from PyPDF2 import PdfReader
 from robyn import Robyn, ALLOW_CORS, WebSocket, Response, Request
 from robyn.types import Body
-import sentry_sdk
-from sentry_sdk import capture_exception
 import logging
 
 # Configure logging at the start of the file
@@ -30,11 +28,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
-sentry_sdk.init(
-    dsn=os.getenv("SENTRY_DSN"),
-    traces_sample_rate=1.0,
-)
 
 load_dotenv()
 
@@ -134,7 +127,6 @@ def parse_array_string(s):
 @app.exception
 def handle_exception(error):
     logger.error(f"Application error: {str(error)}", exc_info=True)
-    capture_exception(error)
     return Response(status_code=500, description=f"error msg: {error}", headers={})
 
 
@@ -143,7 +135,16 @@ redis_host = os.getenv("REDIS_URL")
 redis_password = os.getenv("REDIS_PASSWORD")
 redis_port = int(os.getenv("REDIS_PORT"))
 redis_url = f"rediss://{redis_user}:{redis_password}@{redis_host}:{redis_port}"
-redis_client = redis.Redis.from_url(redis_url)
+redis_client = redis.Redis.from_url(
+    redis_url,
+    decode_responses=True,
+    socket_timeout=5,
+    socket_connect_timeout=5,
+    socket_keepalive=True,
+    health_check_interval=30,
+    retry_on_timeout=True,
+    max_connections=250  # this is the max number of connections to the redis server
+)
 CACHE_EXPIRATION = 60 * 60 * 24  # 24 hours in seconds
 
 
@@ -521,14 +522,25 @@ def create_memory_object(user_id, meeting_id, transcript, cache_key):
 
 @app.post("/end_meeting")
 async def end_meeting(request, body: EndMeetingRequest):
+    # the logic here could be simplified as well
+    # TODO: simplify the logic
     data = json.loads(body)
     transcript = data["transcript"]
     cache_key = get_cache_key(transcript)
+    user_id = data.get("user_id", None)
+    meeting_id = data.get("meeting_id", None)
 
-    if not "meeting_id" in data:
-        if not "user_id" in data:
-            return None
-        
+
+    if not user_id:
+        # this is a temporary fix for the issue
+        # we need to fix this in the future
+        # TODO: figure out why tf are we not sending user_id from the chrome extension
+        return {
+            "notes_content": generate_notes(transcript),
+            "actions_items": extract_action_items(transcript)
+        }
+    
+    if not meeting_id:
         action_items = extract_action_items(transcript)
         notes_content = generate_notes(transcript)
         
@@ -537,10 +549,7 @@ async def end_meeting(request, body: EndMeetingRequest):
             "actions_items": action_items
         }
     
-
-    user_id = data["user_id"]
-    meeting_id = data["meeting_id"]
-
+    
     is_memory_enabled = supabase.table("users").select("memory_enabled").eq("id", user_id).execute().data[0]["memory_enabled"]
 
     if is_memory_enabled is True:
@@ -668,7 +677,6 @@ async def submit(request: Request, body: ActionItemsRequest):
     
     # notion_url = create_note(notes_content)
     emails = data["emails"]
-    print(emails, type(emails), data)
     successful_emails = send_email_summary(emails, action_items, meeting_summary)
 
     if successful_emails["type"] == "error":
@@ -931,26 +939,42 @@ async def on_message(ws, msg):
 
         if type_ == "transcript_update":
             primary_user_key = f"primary_user:{meeting_id}"
+            meeting_key = f"meeting:{meeting_id}"
             
-            if not redis_client.exists(primary_user_key):
-                redis_client.set(primary_user_key, ws.id)
+            try:
+                # Check if primary user exists and get value
+                exists = redis_client.exists(primary_user_key)
+                primary_user = redis_client.get(primary_user_key) if exists else None
 
-
-            if redis_client.get(primary_user_key).decode() == ws.id:
-                # Safely access transcript data
-                if data is None:
-                    return ""
-                    
-                transcript = data
-                current_transcript = redis_client.get(f"meeting:{meeting_id}")
-                
-                if current_transcript:
-                    current_transcript = current_transcript.decode()
+                if not exists:
+                    redis_client.set(primary_user_key, ws.id)
+                    is_primary = True
                 else:
-                    current_transcript = ""
+                    is_primary = primary_user == ws.id
 
-                updated_transcript = current_transcript + transcript
-                redis_client.setex(f"meeting:{meeting_id}", CACHE_EXPIRATION, updated_transcript)
+                # Only proceed if this is the primary user
+                if not is_primary or data is None:
+                    return ""
+
+                # Get current transcript
+                current_transcript = redis_client.get(meeting_key)
+                exists = redis_client.exists(meeting_key)
+
+                # Combine existing and new transcript
+                updated_transcript = (current_transcript if exists else "") + data
+
+                # Set updated transcript with expiration
+                redis_client.setex(
+                    name=meeting_key,
+                    time=CACHE_EXPIRATION,
+                    value=updated_transcript
+                )
+
+                logger.debug(f"Successfully updated transcript for meeting {meeting_id}")
+
+            except Exception as e:
+                logger.error(f"Error in updating transcript: {str(e)}", exc_info=True)
+                return ""
 
         elif type_ == "check_suggestion":
             data["meeting_id"] = meeting_id
@@ -988,7 +1012,6 @@ async def track(request: Request, body: TrackingRequest):
 
         return {"result": "success"}
     except Exception as e:
-        capture_exception(e)  # Send error to Sentry
         return Response(
             status_code=500,
             description=f"Error tracking event: {str(e)}",
@@ -999,7 +1022,7 @@ async def track(request: Request, body: TrackingRequest):
 async def close(ws, msg):
     meeting_id = ws.query_params.get("meeting_id")
     primary_user_key = f"primary_user:{meeting_id}"
-    if redis_client.get(primary_user_key).decode() == ws.id:
+    if redis_client.get(primary_user_key) == ws.id:
         redis_client.delete(primary_user_key)
 
     return ""
