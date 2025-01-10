@@ -867,6 +867,7 @@ async def on_connect(ws, msg):
 
     try:
         if not redis_client.exists(f"meeting:{meeting_id}"):
+            logger.info(f"Creating a meeting id in redis: {meeting_id} and user_id: {user_id}")
             redis_client.set(f"meeting:{meeting_id}", "")
     except Exception as e:
         logger.error(f"Error in setting meeting:{meeting_id} in Redis: {str(e)}", exc_info=True)
