@@ -958,7 +958,7 @@ async def on_message(ws, msg):
                 current_transcript = redis_client.get(meeting_key)
 
                 # Combine existing and new transcript
-                updated_transcript = (current_transcript.decode() if current_transcript is not None else "") + data
+                updated_transcript = (current_transcript if current_transcript is not None else "") + data
 
                 # Set updated transcript with expiration
                 redis_client.setex(
