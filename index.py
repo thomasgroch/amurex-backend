@@ -675,7 +675,6 @@ async def submit(request: Request, body: ActionItemsRequest):
     
     # notion_url = create_note(notes_content)
     emails = data["emails"]
-    print(emails, type(emails), data)
     successful_emails = send_email_summary(emails, action_items, meeting_summary)
 
     if successful_emails["type"] == "error":
@@ -949,7 +948,7 @@ async def on_message(ws, msg):
                     redis_client.set(primary_user_key, ws.id)
                     is_primary = True
                 else:
-                    is_primary = primary_user.decode() == ws.id
+                    is_primary = primary_user == ws.id
 
                 # Only proceed if this is the primary user
                 if not is_primary or data is None:
@@ -960,7 +959,7 @@ async def on_message(ws, msg):
                 exists = redis_client.exists(meeting_key)
 
                 # Combine existing and new transcript
-                updated_transcript = (current_transcript.decode() if exists else "") + data
+                updated_transcript = (current_transcript if exists else "") + data
 
                 # Set updated transcript with expiration
                 redis_client.setex(
