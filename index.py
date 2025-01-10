@@ -20,8 +20,6 @@ from io import BytesIO
 from PyPDF2 import PdfReader
 from robyn import Robyn, ALLOW_CORS, WebSocket, Response, Request
 from robyn.types import Body
-import sentry_sdk
-from sentry_sdk import capture_exception
 import logging
 
 # Configure logging at the start of the file
@@ -30,11 +28,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
-sentry_sdk.init(
-    dsn=os.getenv("SENTRY_DSN"),
-    traces_sample_rate=1.0,
-)
 
 load_dotenv()
 
@@ -134,7 +127,6 @@ def parse_array_string(s):
 @app.exception
 def handle_exception(error):
     logger.error(f"Application error: {str(error)}", exc_info=True)
-    capture_exception(error)
     return Response(status_code=500, description=f"error msg: {error}", headers={})
 
 
@@ -1010,7 +1002,6 @@ async def track(request: Request, body: TrackingRequest):
 
         return {"result": "success"}
     except Exception as e:
-        capture_exception(e)  # Send error to Sentry
         return Response(
             status_code=500,
             description=f"Error tracking event: {str(e)}",
