@@ -942,10 +942,9 @@ async def on_message(ws, msg):
             
             try:
                 # Check if primary user exists and get value
-                exists = redis_client.exists(primary_user_key)
-                primary_user = redis_client.get(primary_user_key) if exists else None
+                primary_user = redis_client.get(primary_user_key)
 
-                if not exists:
+                if primary_user is None:
                     redis_client.set(primary_user_key, ws.id)
                     is_primary = True
                 else:
@@ -957,10 +956,9 @@ async def on_message(ws, msg):
 
                 # Get current transcript
                 current_transcript = redis_client.get(meeting_key)
-                exists = redis_client.exists(meeting_key)
 
                 # Combine existing and new transcript
-                updated_transcript = (current_transcript.decode() if exists else "") + data
+                updated_transcript = (current_transcript.decode() if current_transcript is not None else "") + data
 
                 # Set updated transcript with expiration
                 redis_client.setex(
@@ -1047,9 +1045,9 @@ async def get_late_summary(path_params):
 @app.get("/check_meeting/:meeting_id")
 async def check_meeting(path_params):
     meeting_id = path_params["meeting_id"]
-    is_meeting = redis_client.exists(f"meeting:{meeting_id}")
+    is_meeting = redis_client.get(f"meeting:{meeting_id}")
 
-    return {"is_meeting": is_meeting}
+    return {"is_meeting": is_meeting is not None}
     
 
 @app.post("/send_user_email")
