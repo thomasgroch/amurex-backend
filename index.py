@@ -1020,7 +1020,7 @@ async def track(request: Request, body: TrackingRequest):
 async def close(ws, msg):
     meeting_id = ws.query_params.get("meeting_id")
     primary_user_key = f"primary_user:{meeting_id}"
-    if redis_client.get(primary_user_key).decode() == ws.id:
+    if redis_client.get(primary_user_key) == ws.id:
         redis_client.delete(primary_user_key)
 
     return ""
