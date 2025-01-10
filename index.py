@@ -315,10 +315,12 @@ def send_email(email, email_type, **kwargs):
     
     elif email_type == "meeting_share":
         share_url = kwargs['share_url']
+        owner_email = kwargs['owner_email']
         meeting_obj_id = kwargs['meeting_obj_id']
-        html = f"""someone shared their meeting notes with you: {share_url}"""
+
         resend_email = os.getenv("RESEND_NOREPLY")
-        subject = "Someone shared their notes with you | Amurex"
+        subject = f"{owner_email} shared their notes with you | Amurex"
+        html = f"""{owner_email} shared their meeting notes with you: {share_url}"""
 
         shared_emails = supabase.table("late_meeting")\
             .select("shared_with")\
@@ -332,7 +334,7 @@ def send_email(email, email_type, **kwargs):
                     .eq("id", meeting_obj_id)\
                     .execute()
             else:
-                return ""
+                pass
         else:
             result = supabase.table("late_meeting")\
                 .update({"shared_with": [email]})\
@@ -1030,11 +1032,14 @@ async def send_user_email(request):
     user_email = json.loads(request.body).get("email")
 
     if email_type == "signup":
-        send_email(user_email, email_type)
+        response = send_email(user_email, email_type)
+        return response
     elif email_type == "meeting_share":
         share_url = json.loads(request.body).get("share_url")
+        owner_email = json.loads(request.body).get("owner_email")
         meeting_obj_id = json.loads(request.body).get("meeting_id")
-        send_email(email=user_email, email_type=email_type, share_url=share_url, meeting_obj_id=meeting_obj_id)
+        response = send_email(email=user_email, email_type=email_type, share_url=share_url, meeting_obj_id=meeting_obj_id, owner_email=owner_email)
+        return response
     else:
         logger.info('oh no')
 
