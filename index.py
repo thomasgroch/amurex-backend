@@ -137,7 +137,6 @@ redis_port = int(os.getenv("REDIS_PORT"))
 redis_url = f"rediss://{redis_user}:{redis_password}@{redis_host}:{redis_port}"
 redis_client = redis.Redis.from_url(
     redis_url,
-    decode_responses=True,
     socket_timeout=5,
     socket_connect_timeout=5,
     socket_keepalive=True,
