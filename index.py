@@ -1021,8 +1021,13 @@ async def track(request: Request, body: TrackingRequest):
 async def close(ws, msg):
     meeting_id = ws.query_params.get("meeting_id")
     primary_user_key = f"primary_user:{meeting_id}"
-    if redis_client.get(primary_user_key) == ws.id:
-        redis_client.delete(primary_user_key)
+    try:
+        if redis_client.get(primary_user_key) == ws.id:
+            logger.info(f"Closing websocket for primary user: {ws.id}")
+            redis_client.delete(primary_user_key)
+    except Exception as e:
+        logger.error(f"Error in closing websocket: {str(e)}", exc_info=True)
+
 
     return ""
 
