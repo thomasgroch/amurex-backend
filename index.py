@@ -970,7 +970,7 @@ async def on_message(ws, msg):
                 logger.debug(f"Successfully updated transcript for meeting {meeting_id}")
 
             except Exception as e:
-                logger.error(f"Error in updating transcript: {str(e)}", exc_info=True)
+                logger.error(f"Error in updating transcript: {str(e)}, {meeting_id}", exc_info=True)
                 return ""
 
         elif type_ == "check_suggestion":
