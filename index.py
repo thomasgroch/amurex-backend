@@ -137,7 +137,6 @@ redis_port = int(os.getenv("REDIS_PORT"))
 redis_url = f"rediss://{redis_user}:{redis_password}@{redis_host}:{redis_port}"
 redis_client = redis.Redis.from_url(
     redis_url,
-    decode_responses=True,
     socket_timeout=5,
     socket_connect_timeout=5,
     socket_keepalive=True,
@@ -869,6 +868,7 @@ async def on_connect(ws, msg):
 
     try:
         if not redis_client.exists(f"meeting:{meeting_id}"):
+            logger.info(f"Creating a meeting id in redis: {meeting_id} and user_id: {user_id}")
             redis_client.set(f"meeting:{meeting_id}", "")
     except Exception as e:
         logger.error(f"Error in setting meeting:{meeting_id} in Redis: {str(e)}", exc_info=True)
@@ -943,13 +943,13 @@ async def on_message(ws, msg):
             
             try:
                 # Check if primary user exists and get value
-                exists = redis_client.exists(primary_user_key)
-                primary_user = redis_client.get(primary_user_key) if exists else None
+                primary_user = redis_client.get(primary_user_key)
 
-                if not exists:
+                if primary_user is None:
                     redis_client.set(primary_user_key, ws.id)
                     is_primary = True
                 else:
+                    is_primary = primary_user == ws.id
                     is_primary = primary_user == ws.id
 
                 # Only proceed if this is the primary user
@@ -958,7 +958,6 @@ async def on_message(ws, msg):
 
                 # Get current transcript
                 current_transcript = redis_client.get(meeting_key)
-                exists = redis_client.exists(meeting_key)
 
                 # Combine existing and new transcript
                 updated_transcript = (current_transcript if exists else "") + data
@@ -973,7 +972,7 @@ async def on_message(ws, msg):
                 logger.debug(f"Successfully updated transcript for meeting {meeting_id}")
 
             except Exception as e:
-                logger.error(f"Error in updating transcript: {str(e)}", exc_info=True)
+                logger.error(f"Error in updating transcript: {str(e)}, {meeting_id}", exc_info=True)
                 return ""
 
         elif type_ == "check_suggestion":
@@ -1043,9 +1042,9 @@ async def get_late_summary(path_params):
 @app.get("/check_meeting/:meeting_id")
 async def check_meeting(path_params):
     meeting_id = path_params["meeting_id"]
-    is_meeting = redis_client.exists(f"meeting:{meeting_id}")
+    is_meeting = redis_client.get(f"meeting:{meeting_id}")
 
-    return {"is_meeting": is_meeting}
+    return {"is_meeting": is_meeting is not None}
     
 
 @app.post("/send_user_email")
