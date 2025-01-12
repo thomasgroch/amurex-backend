@@ -867,7 +867,7 @@ async def on_connect(ws, msg):
 
     # Create Redis connection for this websocket
     redis_url = f"rediss://{redis_user}:{redis_password}@{redis_host}:{redis_port}"
-    websocket_redis_clients[ws.id] = redis.Redis.from_url(
+    redis_client = redis.Redis.from_url(
         redis_url,
         decode_responses=True,
         socket_timeout=5,
@@ -876,21 +876,22 @@ async def on_connect(ws, msg):
         health_check_interval=30,
         retry_on_timeout=True
     )
+    websocket_redis_clients[ws.id] = redis_client
 
     try:
-        if not websocket_redis_clients[ws.id].exists(f"meeting:{meeting_id}"):
+        if not redis_client.exists(f"meeting:{meeting_id}"):
             logger.info(f"Creating a meeting id in redis: {meeting_id} and user_id: {user_id}")
-            websocket_redis_clients[ws.id].set(f"meeting:{meeting_id}", "")
+            redis_client.set(f"meeting:{meeting_id}", "")
     except Exception as e:
         logger.error(f"Error in setting meeting:{meeting_id} in Redis: {str(e)}", exc_info=True)
         pass
 
     primary_user_key = f"primary_user:{meeting_id}"
     if user_id is not None and user_id != "undefined" and user_id != "null":
-        if not websocket_redis_clients[ws.id].exists(primary_user_key):
+        if not redis_client.exists(primary_user_key):
             logger.info(f"Setting primary user for meeting {meeting_id}")
             try:
-                websocket_redis_clients[ws.id].set(primary_user_key, ws.id)
+                redis_client.set(primary_user_key, ws.id)
             except Exception as e:
                 logger.error(f"Error in setting primary_user:{meeting_id}: {str(e)}", exc_info=True)
                 pass
@@ -950,7 +951,23 @@ async def on_message(ws, msg):
             meeting_key = f"meeting:{meeting_id}"
             
             try:
-                redis_client = websocket_redis_clients[ws.id]
+                # Safely get Redis client for this websocket
+                redis_client = websocket_redis_clients.get(ws.id)
+                if not redis_client:
+                    # Recreate Redis client if missing
+                    redis_url = f"rediss://{redis_user}:{redis_password}@{redis_host}:{redis_port}"
+                    redis_client = redis.Redis.from_url(
+                        redis_url,
+                        decode_responses=True,
+                        socket_timeout=5,
+                        socket_connect_timeout=5,
+                        socket_keepalive=True,
+                        health_check_interval=30,
+                        retry_on_timeout=True
+                    )
+                    websocket_redis_clients[ws.id] = redis_client
+                    logger.info(f"Created new Redis client for websocket {ws.id}")
+
                 # Check if primary user exists and get value
                 primary_user = redis_client.get(primary_user_key)
 
@@ -986,7 +1003,6 @@ async def on_message(ws, msg):
         elif type_ == "check_suggestion":
             data["meeting_id"] = meeting_id
             response = check_suggestion(data)
-
             return json.dumps(response)
 
     except json.JSONDecodeError as e:
@@ -1028,25 +1044,26 @@ async def track(request: Request, body: TrackingRequest):
 async def close(ws, msg):
     meeting_id = ws.query_params.get("meeting_id")
     primary_user_key = f"primary_user:{meeting_id}"
-    try:
-        if websocket_redis_clients[ws.id].get(primary_user_key) == ws.id:
-            logger.info(f"Closing websocket for primary user: {ws.id}")
-            websocket_redis_clients[ws.id].delete(primary_user_key)
-        
-        # Close Redis connection and remove from map
-        websocket_redis_clients[ws.id].close()
-        del websocket_redis_clients[ws.id]
-        logger.info(f"Closed Redis connection for websocket {ws.id}")
-    except Exception as e:
-        logger.error(f"Error in closing websocket: {str(e)}", exc_info=True)
-    try:
-        if redis_client.get(primary_user_key) == ws.id:
-            logger.info(f"Closing websocket for primary user: {ws.id}")
-            redis_client.delete(primary_user_key)
-    except Exception as e:
-        logger.error(f"Error in closing websocket: {str(e)}", exc_info=True)
-
-
+    
+    # Safely get the Redis client for this websocket
+    redis_client = websocket_redis_clients.get(ws.id)
+    if redis_client:
+        try:
+            # Check if this was the primary user
+            primary_user = redis_client.get(primary_user_key)
+            if primary_user == ws.id:
+                logger.info(f"Closing websocket for primary user: {ws.id}")
+                redis_client.delete(primary_user_key)
+            
+            # Close Redis connection and remove from map
+            redis_client.close()
+            del websocket_redis_clients[ws.id]
+            logger.info(f"Closed Redis connection for websocket {ws.id}")
+        except Exception as e:
+            logger.error(f"Error in closing Redis connection: {str(e)}", exc_info=True)
+    else:
+        logger.warning(f"No Redis client found for websocket {ws.id} during close")
+    
     return ""
 
 
