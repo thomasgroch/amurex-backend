@@ -557,7 +557,7 @@ async def end_meeting(request, body: EndMeetingRequest):
 
     if is_memory_enabled is True:
         meeting_obj = supabase.table("late_meeting").select("id, transcript").eq("meeting_id", meeting_id).execute().data
-        if not meeting_obj:
+        if not meeting_obj or len(meeting_obj) == 0 or meeting_obj[0]["transcript"] is None:
             result = supabase.table("late_meeting").upsert({
                     "meeting_id": meeting_id,
                     "user_ids": [user_id],
