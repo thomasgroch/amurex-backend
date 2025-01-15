@@ -8,7 +8,6 @@ import json
 import os
 import time
 import numpy as np
-import redis
 from hashlib import sha256
 from typing import List, Optional
 from groq import Groq
@@ -31,8 +30,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 load_dotenv()
-
-websocket_redis_clients = {}  # Global map to store Redis clients
 
 # Initialize database manager
 db = DatabaseManager()
@@ -134,21 +131,6 @@ def handle_exception(error):
     logger.error(f"Application error: {str(error)}", exc_info=True)
     return Response(status_code=500, description=f"error msg: {error}", headers={})
 
-
-redis_user = os.getenv("REDIS_USERNAME")
-redis_host = os.getenv("REDIS_URL")
-redis_password = os.getenv("REDIS_PASSWORD")
-redis_port = int(os.getenv("REDIS_PORT"))
-redis_url = f"rediss://{redis_user}:{redis_password}@{redis_host}:{redis_port}"
-redis_client = redis.Redis.from_url(
-    redis_url,
-    health_check_interval=10,
-    socket_connect_timeout=5,
-    socket_keepalive=True,
-    retry_on_timeout=True,
-    max_connections=250  # this is the max number of connections to the redis server
-)
-CACHE_EXPIRATION = 60 * 60 * 24  # 24 hours in seconds
 
 
 def get_cache_key(transcript: str) -> str:
@@ -493,13 +475,8 @@ class ActionItemsRequest(Body):
     meeting_summary: Optional[str] = None
 
 
-def create_memory_object(user_id, meeting_id, transcript, cache_key):
+def create_memory_object(transcript):
     # Try to get from cache
-    cached_result = redis_client.get(cache_key)
-    if cached_result:
-        logger.info("Retrieved result from cache")
-        return json.loads(cached_result)
-    
     logger.info("Cache miss - generating new results")
     
     # Generate new results if not in cache
@@ -513,13 +490,6 @@ def create_memory_object(user_id, meeting_id, transcript, cache_key):
         "title": title
     }
     
-    # Cache the result
-    redis_client.setex(
-        cache_key,
-        CACHE_EXPIRATION,
-        json.dumps(result)
-    )
-    
     return result
 
 
@@ -529,7 +499,6 @@ async def end_meeting(request, body: EndMeetingRequest):
     # TODO: simplify the logic
     data = json.loads(body)
     transcript = data["transcript"]
-    cache_key = get_cache_key(transcript)
     user_id = data.get("user_id", None)
     meeting_id = data.get("meeting_id", None)
 
@@ -595,12 +564,12 @@ async def end_meeting(request, body: EndMeetingRequest):
 
                 result = {
                     "action_items": action_items,
-                    "notes_content": notes_content
+                    "notes_content": summary
                 }
 
                 return result
         else:
-            memory_obj = create_memory_object(user_id=user_id, meeting_id=meeting_id, transcript=transcript, cache_key=cache_key)
+            memory_obj = create_memory_object(transcript=transcript)
 
             content = memory_obj["notes_content"] + memory_obj["action_items"]
             content_chunks = get_chunks(content)
@@ -690,6 +659,30 @@ async def submit(request: Request, body: ActionItemsRequest):
     
     return {"successful_emails": successful_emails["emails"]}
 
+class TrackingRequest(Body):
+    uuid: str
+    event_type: str
+    meeting_id: Optional[str] = None
+
+@app.post("/track")
+async def track(request: Request, body: TrackingRequest):
+    try:
+        data = json.loads(body)
+        uuid = data["uuid"]
+        event_type = data["event_type"]
+        meeting_id = data.get("meeting_id")
+        result = supabase.table("analytics").insert({
+            "uuid": uuid,
+            "event_type": event_type,
+            "meeting_id": meeting_id
+        }).execute()
+        return {"result": "success"}
+    except Exception as e:
+        return Response(
+            status_code=500,
+            description=f"Error tracking event: {str(e)}",
+            headers={}
+        )
 
 @app.get("/")
 def home():
