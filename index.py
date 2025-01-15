@@ -21,6 +21,7 @@ from robyn import Robyn, ALLOW_CORS, WebSocket, Response, Request
 from robyn.types import Body
 import logging
 from database.db_manager import DatabaseManager
+from functools import lru_cache
 
 # Configure logging at the start of the file
 logging.basicConfig(
@@ -138,6 +139,7 @@ def get_cache_key(transcript: str) -> str:
     return f"transcript:{sha256(transcript.encode()).hexdigest()}"
 
 
+@lru_cache
 def extract_action_items(transcript):
     # Sample prompt to instruct the model on extracting action items per person
     messages = [
@@ -173,10 +175,16 @@ def extract_action_items(transcript):
         response_format={"type": "json_object"}
     )
 
+    if response is None:
+        logger.error("Error extracting action items")
+        return "No action items found."
+
+
     action_items = json.loads(response)["html"]
     return action_items
 
 
+@lru_cache
 def generate_notes(transcript):
     messages = [
         {
@@ -196,6 +204,7 @@ def generate_notes(transcript):
     return notes
 
 
+@lru_cache
 def generate_title(summary):
     messages = [
         {
