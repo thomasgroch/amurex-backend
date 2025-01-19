@@ -190,18 +190,19 @@ def generate_notes(transcript):
     messages = [
         {
             "role": "user",
-            "content": f"""You are an executive assistant tasked with taking notes from an online meeting transcript.
-                Full transcript: {transcript}"""
+            "content": f"""You are an executive assistant tasked with taking notes from an online meeting transcript. You must produce the notes in Markdown format
+                Full transcript: {transcript}. Follow the JSON structure:""" + "{notes: meeting notes}"
         }
     ]
 
     response = ai_client.chat_completions_create(
         model="gpt-4o",
         messages=messages,
-        temperature=0.2
+        temperature=0.2,
+        response_format={"type": "json_object"}
     )
 
-    notes = response
+    notes = json.loads(response)["notes"]
     return notes
 
 
@@ -209,19 +210,23 @@ def generate_notes(transcript):
 def generate_title(summary):
     messages = [
         {
+            "role": "system",
+            "content": f"""You are an executive assistant tasked with generating titles for meetings based on the meeting summaries."""
+        },
+        {
             "role": "user",
-            "content": f"""You are an executive assistant tasked with generating titles for meetings based on the meeting summaries.
-                Full summary: {summary}"""
+            "content": "Generate a title for the following meeting summary. You must follow the JSON schema: {title: generated title}" + f"Full summary: {summary}"
         }
     ]
 
     response = ai_client.chat_completions_create(
         model="gpt-4o",
         messages=messages,
-        temperature=0.2
+        temperature=0.2,
+        response_format={"type": "json_object"}
     )
 
-    title = response
+    title = json.loads(response)["title"]
     return title
 
 
