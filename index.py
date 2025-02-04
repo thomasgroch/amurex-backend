@@ -933,14 +933,14 @@ def check_suggestion(request_dict):
                     "type": "no_file_found"
                     }
 
-            logger.info("This is the suggestion count: %s ", sb_response["suggestion_count"])
-            if int(sb_response["suggestion_count"]) == 10:
-                return {
-                    "files_found": True,
-                    "generated_suggestion": None,
-                    "last_question": None,
-                    "type": "exceeded_response"
-                }
+            # logger.info("This is the suggestion count: %s ", sb_response["suggestion_count"])
+            # if int(sb_response["suggestion_count"]) == 10:
+                # return {
+                    # "files_found": True,
+                    # "generated_suggestion": None,
+                    # "last_question": None,
+                    # "type": "exceeded_response"
+                # }
             
             file_chunks = sb_response["chunks"]
             embedded_chunks = sb_response["embeddings"]
@@ -989,11 +989,11 @@ def check_suggestion(request_dict):
 
                 suggestion = generate_realtime_suggestion(context=closest_chunks, transcript=transcript)
 
-                result = supabase.table("meetings")\
-                        .update({"suggestion_count": int(sb_response["suggestion_count"]) + 1})\
-                        .eq("meeting_id", meeting_id)\
-                        .eq("user_id", user_id)\
-                        .execute()
+                # result = supabase.table("meetings")\
+                #         .update({"suggestion_count": int(sb_response["suggestion_count"]) + 1})\
+                #         .eq("meeting_id", meeting_id)\
+                #         .eq("user_id", user_id)\
+                #         .execute()
 
                 return {
                     "files_found": True,
