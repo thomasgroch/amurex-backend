@@ -23,6 +23,24 @@ import logging
 from database.db_manager import DatabaseManager
 from functools import lru_cache
 import asyncio
+import redis
+
+
+redis_user = os.getenv("REDIS_USERNAME")
+redis_host = os.getenv("REDIS_URL")
+redis_password = os.getenv("REDIS_PASSWORD")
+redis_port = int(os.getenv("REDIS_PORT", 6379))
+redis_url = f"rediss://{redis_user}:{redis_password}@{redis_host}:{redis_port}"
+redis_client = redis.Redis.from_url(
+    redis_url,
+    health_check_interval=10,
+    socket_connect_timeout=5,
+    socket_keepalive=True,
+    retry_on_timeout=True,
+    max_connections=250  # this is the max number of connections to the redis server
+)
+CACHE_EXPIRATION = 60 * 60 * 24  # 24 hours in seconds
+
 
 # Configure logging at the start of the file
 logging.basicConfig(
