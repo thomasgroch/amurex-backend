@@ -244,6 +244,7 @@ def generate_notes(transcript):
 
 @lru_cache
 def generate_title(summary):
+    print("This is the summary being passed to the title generator: ", summary)
     messages = [
         {
             "role": "system",
