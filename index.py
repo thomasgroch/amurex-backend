@@ -1157,6 +1157,7 @@ async def get_late_summary(path_params):
     if not meeting or not meeting['transcript']:
         return {"late_summary": ""}
 
+    print("This is the late meeting transcript: ", meeting_id,  meeting['transcript'])
     late_summary = generate_notes(meeting['transcript'])
     return {"late_summary": late_summary}
 
