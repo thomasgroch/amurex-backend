@@ -204,7 +204,6 @@ def extract_action_items(transcript):
     return action_items
 
 
-@lru_cache
 def generate_notes(transcript):
     messages = [
         {
@@ -242,7 +241,6 @@ def generate_notes(transcript):
     return notes
 
 
-@lru_cache
 def generate_title(summary):
     print("This is the summary being passed to the title generator: ", summary)
     messages = [
