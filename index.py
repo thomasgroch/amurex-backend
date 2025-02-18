@@ -68,7 +68,7 @@ class AIClientAdapter:
             "gpt-4o": "llama3.2"
         }
         groq = {
-            "llama-3.3": "llama-3.3-70b-versatile",
+            "llama-3.3": "llama-3.3-70b-specdec",
             "llama-3.2": "llama3-70b-8192"
         }
         if self.client_mode == "LOCAL":
@@ -230,12 +230,18 @@ def generate_notes(transcript):
         }
     ]
 
-    response = ai_client.chat_completions_create(
-        model="llama-3.3",
-        messages=messages,
-        temperature=0.2,
-        response_format={"type": "json_object"}
-    )
+    try:
+        response = ai_client.chat_completions_create(
+            model="llama-3.3",
+            messages=messages,
+            temperature=0.2,
+            response_format={"type": "json_object"}
+        )
+    except Exception as e:
+        if "failed_generation" in str(e):
+            response = e["failed_generation"]
+        else:
+            return "No notes found."
 
     notes = json.loads(response)["notes"]
     return notes
