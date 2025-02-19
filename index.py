@@ -593,7 +593,7 @@ def send_email(email, email_type, **kwargs):
                         <p
                         style="color:rgb(0,0,0);font-size:14px;line-height:24px;margin:16px 0"
                         >Here's a quick recap of your meeting:
-                        </p>
+                        </p>""" +
                       
                       {summary[:150].replace('\n                    ', '\n')\
                        .replace('## ', '<h3 style="margin-bottom: 0.25rem; font-size: 1.125rem; font-weight: 700;">')\
@@ -602,6 +602,7 @@ def send_email(email, email_type, **kwargs):
                        .replace('\n-', '</li>\n<li style="margin-bottom: 0.25rem; margin-left: 1rem;">')\
                        .strip() + "..."}\n\n
                       
+                        + f"""
                         <table
                         align="center"
                         width="100%"
