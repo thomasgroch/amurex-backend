@@ -14,7 +14,6 @@ from groq import Groq
 import uuid
 import fitz
 from dotenv import load_dotenv
-from mixedbread_ai.client import MixedbreadAI
 from io import BytesIO
 from PyPDF2 import PdfReader
 from robyn import Robyn, ALLOW_CORS, WebSocket, Response, Request
@@ -24,6 +23,7 @@ from database.db_manager import DatabaseManager
 from functools import lru_cache
 import asyncio
 import redis
+from mistralai import Mistral
 import re
 import multiprocessing
 
@@ -108,7 +108,8 @@ class EmbeddingAdapter:
             from fastembed import TextEmbedding  # Import fastembed only when running project locally
             self.fastembed_model = TextEmbedding(model_name="BAAI/bge-base-en")
         elif self.client_mode == "ONLINE":
-            self.mxbai_client = MixedbreadAI(api_key=os.getenv("MXBAI_API_KEY"))
+            # Initialize Mistral client instead of MixedbreadAI
+            self.mistral_client = Mistral(api_key=os.getenv("MISTRAL_API_KEY"))
 
     def embeddings(self, text):
         if self.client_mode == "LOCAL":
@@ -116,15 +117,14 @@ class EmbeddingAdapter:
             result = np.array(list(self.fastembed_model.embed([text])))[-1].tolist()
             return result
         elif self.client_mode == "ONLINE":
-            # Use the MixedbreadAI client to generate embeddings
-            result = self.mxbai_client.embeddings(
-                model='mixedbread-ai/mxbai-embed-large-v1',
-                input=[text],
-                normalized=True,
-                encoding_format='float',
-                truncation_strategy='end'
+            # Use the Mistral client to generate embeddings
+            model = "mistral-embed"
+            response = self.mistral_client.embeddings.create(
+                model=model,
+                inputs=[text]
             )
-            return result.data[0].embedding
+
+            return response.data[0].embedding
 
 
 client_mode = os.getenv("CLIENT_MODE")
