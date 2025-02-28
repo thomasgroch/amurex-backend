@@ -400,8 +400,8 @@ def extract_action_items(transcript):
 
     # Sending the prompt to the AI model using chat completions
     response = ai_client.chat_completions_create(
-        # model="llama-3.3",
-        model="gpt-4o",
+        model="llama-3.3",
+        # model="gpt-4o",
         messages=messages,
         temperature=0.2,
         response_format={"type": "json_object"}
@@ -448,8 +448,8 @@ def generate_notes(transcript):
 
     try:
         response = ai_client.chat_completions_create(
-            # model="llama-3.3",
-            model="gpt-4o",
+            model="llama-3.3",
+            # model="gpt-4o",
             messages=messages,
             temperature=0.2,
             response_format={"type": "json_object"}
@@ -469,17 +469,25 @@ def generate_title(summary):
     messages = [
         {
             "role": "system",
-            "content": f"""You are an executive assistant tasked with generating titles for meetings based on the meeting summaries."""
+            "content": (
+                "You are an executive assistant tasked with generating concise meeting titles. "
+                "Use the participants' names and the meeting date from the summary when available. "
+                "Keep the title relevant and limited to 10 words."
+            )
         },
         {
             "role": "user",
-            "content": "Generate a title for the following meeting summary. You must follow the JSON schema: {title: generated title}" + f"Full summary: {summary}"
+            "content": (
+                'Generate a title for the following meeting summary. '
+                'Return the response in JSON format following this schema: {"title": "<generated title>"}. '
+                f'Full summary: {summary}'
+            )
         }
     ]
 
     response = ai_client.chat_completions_create(
-        # model="llama-3.3",
-        model="gpt-4o",
+        model="llama-3.3",
+        # model="gpt-4o",
         messages=messages,
         temperature=0.2,
         response_format={"type": "json_object"}
