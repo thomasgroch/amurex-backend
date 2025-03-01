@@ -522,7 +522,7 @@ def send_email_summary(list_emails, actions, meeting_summary = None):
         formatted_time = time.strftime("%d %b %Y %I:%M%p", current_time)
         for email in list_emails:
             payload = {
-                "from": resend_email,
+                "from": f"Amurex {resend_email}",
                 "to": email,
                 "subject": f"Summary | Meeting on {formatted_time} | Amurex",
                 "html": html
@@ -1080,7 +1080,7 @@ def send_email(email, email_type, **kwargs):
 
 
     payload = {
-        "from": resend_email,
+        "from": f"Amurex {resend_email}",
         "to": email,
         "subject": subject,
         "html": html
