@@ -1070,6 +1070,16 @@ def send_email(email, email_type, **kwargs):
                                                 If you were not expecting this invitation, you can ignore this email. If you are
                                                 concerned about your account&#x27;s safety, please get in touch with <a href="mailto:founders@thepersonalaicompany.com">founders@thepersonalaicompany.com</a>.
                                             </p>
+                                            <p
+                                            style="
+                                                color: rgb(102, 102, 102);
+                                                font-size: 12px;
+                                                line-height: 24px;
+                                                margin: 16px 0;
+                                                "
+                                            >
+                                                If you don't want to receive these emails in the future, you can easily <a href="https://app.amurex.ai/settings" style="color: rgb(37, 99, 235); text-decoration-line: none">turn them off.</a>
+                                            </p>
                                         </td>
                                     </tr>
                                 </tbody>
