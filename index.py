@@ -47,7 +47,7 @@ CACHE_EXPIRATION = 60 * 60 * 24  # 24 hours in seconds
 # Configure logging at the start of the file
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
 )
 logger = logging.getLogger(__name__)
 
@@ -1223,6 +1223,11 @@ def create_memory_object(transcript):
     # Generate new results if not in cache
     action_items = extract_action_items(transcript)
     notes_content = generate_notes(transcript)
+
+    # Ensure notes_content is a string before generating title
+    if isinstance(notes_content, list):
+        notes_content = '\n'.join(notes_content)
+
     title = generate_title(notes_content)
     
     result = {
@@ -1238,9 +1243,15 @@ def check_memory_enabled(user_id):
     return supabase.table("users").select("memory_enabled").eq("id", user_id).execute().data[0]["memory_enabled"]
 
 @app.post("/end_meeting")
-async def end_meeting(request, body: EndMeetingRequest):
+async def end_meeting(request: Request, body: EndMeetingRequest):
     # the logic here could be simplified as well
     # TODO: simplify the logic
+    if request.ip_addr == "41.182.69.223":
+        return {
+            "action_items": "<h1>You</h1><p>be careful next time ;)</p>",
+            "notes_content": "you are being watched"
+        }
+
     data = json.loads(body)
     transcript = data["transcript"]
     user_id = data.get("user_id", None)
@@ -1395,6 +1406,18 @@ async def track(request: Request, body: TrackingRequest):
             description=f"Error tracking event: {str(e)}",
             headers={}
         )
+
+
+@app.before_request()
+def before_request(request: Request):
+    # WALL OF SHAME FOR THE IPS TRYING TO DOS US
+    if request.ip_addr == "41.182.69.223":
+        return {
+            "action_items": "<h1>You</h1><p>be careful next time ;)</p>",
+            "notes_content": "you are being watched"
+        }
+    return request
+
 
 @app.get("/")
 def home():
@@ -1797,6 +1820,7 @@ async def get_history(request):
 
 @app.get("/health_check")
 async def health_check():
+    logger.info("Health check request received")
     return {"status": "ok"}
 
 
