@@ -1172,7 +1172,7 @@ def send_email(email, email_type, **kwargs):
 
 
     payload = {
-        "from": f"Amurex {resend_email}",
+        "from": f"Amurex <{resend_email}>",
         "to": email,
         "subject": subject,
         "html": html
