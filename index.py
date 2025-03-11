@@ -603,8 +603,9 @@ def send_email_summary(list_emails, actions, meeting_summary = None):
         current_time = time.localtime()
         formatted_time = time.strftime("%d %b %Y %I:%M%p", current_time)
         for email in list_emails:
+            logger.info(f"Sending email to {email}")
             payload = {
-                "from": f"Amurex {resend_email}",
+                "from": f"Amurex <{resend_email}>",
                 "to": email,
                 "subject": f"Summary | Meeting on {formatted_time} | Amurex",
                 "html": html
@@ -1177,6 +1178,7 @@ def send_email(email, email_type, **kwargs):
         "subject": subject,
         "html": html
     }
+    logger.info(f"Sending email to {email}")
 
     headers = {
         "Authorization": f"Bearer {resend_key}",
@@ -1186,6 +1188,7 @@ def send_email(email, email_type, **kwargs):
     response = requests.request("POST", url, json=payload, headers=headers)
 
     if response.status_code != 200:
+        logger.error(f"Error sending email to {email}: {response.text}")
         return {"type": "error", "error": f"Error sending email to {email}: {response.text}"}
 
     return {"type": "success", "error": None}
