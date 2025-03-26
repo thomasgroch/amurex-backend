@@ -215,7 +215,7 @@ ALLOW_CORS(app, origins = ["*"])
 
 
 url = os.getenv("SUPABASE_URL")
-key = os.getenv("SUPABASE_ANON_KEY")
+key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 supabase: Client = create_client(url, key)
 
 
@@ -1568,7 +1568,7 @@ def create_memory_object(transcript):
     # Generate new results if not in cache
     word_count = len(transcript.split())
 
-    if word_count <= 20000:
+    if word_count <= 1:
         action_items = extract_action_items(transcript)
         notes_content = generate_notes(transcript)
     else:
