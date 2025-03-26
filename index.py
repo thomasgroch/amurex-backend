@@ -28,6 +28,7 @@ import re
 import multiprocessing
 from google import genai
 from google.genai import types
+import groq
 
 
 redis_user = os.getenv("REDIS_USERNAME")
@@ -775,7 +776,8 @@ def generate_notes(transcript):
             
             except Exception as e:
                 if "failed_generation" in str(e):
-                    tmp_notes = e["failed_generation"]
+                    new_error: groq.BadRequestError = e
+                    tmp_notes = new_error.response.text
                     continue
                 else:
                     logger.error(f"Error processing chunk {i}: {str(e)}")
