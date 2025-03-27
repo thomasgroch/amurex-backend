@@ -496,7 +496,8 @@ def extract_action_items(transcript):
             )
         except Exception as e:
             if "failed_generation" in str(e):
-                response = e["failed_generation"]
+                new_error: groq.BadRequestError = e
+                response = new_error.response.text
             else:
                 return "No action items found."
     else:
