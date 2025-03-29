@@ -1580,7 +1580,7 @@ def create_memory_object(transcript):
     #     action_items = extract_action_items(transcript)
     #     notes_content = generate_notes(transcript)
     # else:
-    res = json.loads(generate_everything(transcript))
+    res = generate_everything(transcript)
     notes_content = res["notes"]
     action_items = res["action_items"]
     # action_items_list = summary["action_items_list"]
@@ -1639,7 +1639,7 @@ async def end_meeting(request: Request, body: EndMeetingRequest):
         # this is a temporary fix for the issue
         # we need to fix this in the future
         # TODO: figure out why tf are we not sending user_id from the chrome extension
-        res = json.loads(generate_everything(transcript))
+        res = generate_everything(transcript)
         notes_content = res["notes"]
         action_items = res["action_items"]
         return {
@@ -1650,7 +1650,7 @@ async def end_meeting(request: Request, body: EndMeetingRequest):
     if not meeting_id:
         # action_items = extract_action_items(transcript)
         # notes_content = generate_notes(transcript)
-        res = json.loads(generate_everything(transcript))
+        res = generate_everything(transcript)
         notes_content = res["notes"]
         action_items = res["action_items"]
         
@@ -1665,7 +1665,7 @@ async def end_meeting(request: Request, body: EndMeetingRequest):
     if not is_memory_enabled:
         # notes_content = generate_notes(transcript)
         # action_items = extract_action_items(transcript)
-        res = json.loads(generate_everything(transcript))
+        res = generate_everything(transcript)
         notes_content = res["notes"]
         action_items = res["action_items"]
         return {
