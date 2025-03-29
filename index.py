@@ -164,16 +164,13 @@ class AIClientAdapter:
                     ],
                 )
 
-                response_text = ""
-                for chunk in self.gemini_client.models.generate_content_stream(
+                response = self.gemini_client.models.generate_content(
                     model=gemini[model],
                     contents=contents,
                     config=generate_content_config,
-                ):
-                    response_text += chunk.text
+                ).text
 
-                return response_text
-
+                return response
 
 class EmbeddingAdapter:
     def __init__(self, client_mode):
@@ -660,7 +657,6 @@ def generate_everything(transcript):
         model=model,
         messages=messages,
         temperature=0.2,
-        response_format={"type": "json_object"}
     )
 
     return response
