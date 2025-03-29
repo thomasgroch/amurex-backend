@@ -667,7 +667,7 @@ def generate_everything(transcript):
 
     result = {
         "action_items": action_items,
-        "notes_content": notes_content
+        "notes": notes_content
     }
 
     return result
