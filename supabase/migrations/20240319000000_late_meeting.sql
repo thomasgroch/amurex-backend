@@ -13,3 +13,4 @@ CREATE TABLE late_meeting (
 
 -- Create an index on meeting_id for faster lookups
 CREATE INDEX idx_late_meeting_meeting_id ON late_meeting(meeting_id);
+
