@@ -175,7 +175,7 @@ class AIClientAdapter:
 class EmbeddingAdapter:
     def __init__(self, client_mode):
         self.client_mode = client_mode
-        
+
         if self.client_mode == "LOCAL":
             from fastembed import TextEmbedding  # Import fastembed only when running project locally
             self.fastembed_model = TextEmbedding(model_name="BAAI/bge-base-en")
@@ -239,14 +239,14 @@ def markdown_to_html(markdown: str) -> str:
     """
     # Split input into lines
     lines = markdown.split('\n')
-    
+
     # State variables
     in_code_block = False
     code_block_delimiter = None
     code_lines = []
     paragraph_lines = []
     html_output = []
-    
+
     def flush_paragraph():
         """Close out the current paragraph buffer and convert it into an HTML <p> block."""
         if paragraph_lines:
@@ -255,7 +255,7 @@ def markdown_to_html(markdown: str) -> str:
             paragraph_text = parse_inline(paragraph_text)
             html_output.append(f"<p>{paragraph_text}</p>")
             paragraph_lines.clear()
-    
+
     def parse_inline(text: str) -> str:
         """
         Perform inline replacements for:
@@ -296,11 +296,11 @@ def markdown_to_html(markdown: str) -> str:
             text
         )
         return text
-    
+
     i = 0
     while i < len(lines):
         line = lines[i]
-        
+
         # Check for fenced code block (start or end)
         fence_match = re.match(r'^(```|~~~)\s*$', line)
         if fence_match:
@@ -326,13 +326,13 @@ def markdown_to_html(markdown: str) -> str:
                     html_output.append(f"<pre><code>{escaped_code}</code></pre>")
             i += 1
             continue
-        
+
         # If we're currently in a fenced code block, gather lines until fence end
         if in_code_block:
             code_lines.append(line)
             i += 1
             continue
-        
+
         # Check for headings: (#{1,6} + text)
         heading_match = re.match(r'^(#{1,6})\s+(.*)', line)
         if heading_match:
@@ -342,7 +342,7 @@ def markdown_to_html(markdown: str) -> str:
             html_output.append(f"<h{level}>{heading_text}</h{level}>")
             i += 1
             continue
-        
+
         # Check for horizontal rule
         hr_match = re.match(r'^(\*[\s\*]*|\-[\s\-]*|_[\s_]*)$', line.strip())
         if hr_match:
@@ -354,7 +354,7 @@ def markdown_to_html(markdown: str) -> str:
                 html_output.append("<hr/>")
                 i += 1
                 continue
-        
+
         # Check for blockquote
         bq_match = re.match(r'^>\s?(.*)', line)
         if bq_match:
@@ -375,7 +375,7 @@ def markdown_to_html(markdown: str) -> str:
             html_output.append(f"<blockquote>{inner_html}</blockquote>")
             i = j
             continue
-        
+
         # Check for lists (unordered or ordered)
         # Unordered: -, +, or * at start
         # Ordered: number followed by a period
@@ -389,7 +389,7 @@ def markdown_to_html(markdown: str) -> str:
             else:
                 list_tag = "ol"
             list_buffer = []
-            
+
             # Gather subsequent lines
             while i < len(lines):
                 l = lines[i]
@@ -398,34 +398,34 @@ def markdown_to_html(markdown: str) -> str:
                     m = re.match(r'^(\*|\-|\+)\s+(.*)', l)
                 else:
                     m = re.match(r'^(\d+)\.\s+(.*)', l)
-                
+
                 if m:
                     item_content = m.group(2)
                     list_buffer.append(item_content)
                     i += 1
                 else:
                     break
-            
+
             # Convert the gathered lines into list items
             html_output.append(f"<{list_tag}>")
             for item in list_buffer:
                 html_output.append(f"  <li>{parse_inline(item)}</li>")
             html_output.append(f"</{list_tag}>")
             continue
-        
+
         # If the line is empty, it signals a paragraph break
         if not line.strip():
             flush_paragraph()
             i += 1
             continue
-        
+
         # Otherwise, treat it as part of a paragraph
         paragraph_lines.append(line.strip())
         i += 1
-    
+
     # Flush any remaining paragraph at the end
     flush_paragraph()
-    
+
     # Join everything into one HTML string
     return "\n".join(html_output)
 
@@ -454,7 +454,7 @@ def extract_action_items(transcript):
                 "content": """You are an executive assistant tasked with extracting action items from a meeting transcript.
                 For each person involved in the transcript, list their name with their respective action items, or state "No action items"
                 if there are none for that person.
-                
+
                 Write it as an html list in a json body. For example:
                 {
                     "action_items_list": [
@@ -507,15 +507,15 @@ def extract_action_items(transcript):
                     "role": "system",
                     "content": """
                     You are an executive assistant tasked with extracting action items from a meeting transcript.
-                    
-                    The transcript is too long to be processed at once, so we need to split it into chunks. 
-                    You have to review the current action item list and add some points if needed. 
+
+                    The transcript is too long to be processed at once, so we need to split it into chunks.
+                    You have to review the current action item list and add some points if needed.
                     Keep the action items super short and concise.
                     Don't add every single point just for the sake of it, only add the ones that are relevant to the main meeting discussion topic.
                     Only add points that are actionable and specific. Dont add points that are vague or unclear, such as "discuss the future of the company" or "increase the revenue".
 
                     For each person involved in the transcript, list their name with their respective action items, or state "No action items" if there are none for that person.
-                    
+
                     Write it as an html list in a json body. For example:
                     {
                         "action_items_list": [
@@ -584,17 +584,17 @@ def extract_action_items(transcript):
 def chunk_text(text, words_per_chunk=50000):
     words = text.split()
     chunks = []
-    
+
     for i in range(0, len(words), words_per_chunk):
         chunk = ' '.join(words[i:i + words_per_chunk])
         chunks.append(chunk)
-    
+
     return chunks
 
 
 def generate_everything(transcript):
     model = "gemini-1.5-pro"
-    
+
     system_instruction = """You are an executive assistant tasked with extracting action items and taking notes from a meeting transcript. Try to be as accurate as possible. And keep the notes concise and to the point.
 
                 For action items: For each person involved in the transcript, list their name with their respective action items, or don't list the person if there are no action items for that person.
@@ -633,7 +633,7 @@ def generate_everything(transcript):
                 - Option was fully received and confirmed.
                 - System is confirmed to be running properly.
                 - Network is functioning correctly."""
-    
+
     user_message = f"Here's the transcript: {transcript}"
 
     messages = [
@@ -699,7 +699,7 @@ def generate_notes(transcript):
                         **Key Points:**
                         - Option was fully received and confirmed.
                         - System is confirmed to be running properly.
-                        - Network is functioning correctly.""" + 
+                        - Network is functioning correctly.""" +
                         "Here's an example of what your JSON output should look like: " +
                         """{
                             "notes": "### Meeting Notes\n\n**Date:** February 19, 2025\n\n**Participants:**\n- You\n- Sanskar Jethi\n\n**Summary:**\n- Discussion about an option being fully received.\n- Confirmation that the system is running properly now.\n- Network issues have been resolved and are working perfectly.\n\n**Key Points:**\n- Option was fully received and confirmed.\n- System is confirmed to be running properly.\n- Network is functioning correctly."
@@ -722,25 +722,25 @@ def generate_notes(transcript):
 
         notes = json.loads(response)["notes"]
         return notes
-    
+
     else:
         # Handle long transcripts by chunking
         chunks = chunk_text(transcript)
         tmp_notes = ""
-        
+
         for i, chunk in enumerate(chunks):
             messages = [
                 {
                     "role": "system",
                     "content": """You are a helpful assistant generating meeting notes in a json format.
-                    
+
                     The json format is:
                     {
                         "edited": true/false,
                         "notes": "meeting notes here if true, else null"
                     }
 
-                    The transcript is too long to be processed at once, so we need to split it into chunks. 
+                    The transcript is too long to be processed at once, so we need to split it into chunks.
                     Keep the notes super short and concise.
                     You have to review the current notes and add some points if needed. Dont remove any points or participants from the previous notes. Only add new points.
 
@@ -781,7 +781,7 @@ def generate_notes(transcript):
                 result = json.loads(response)
                 if result["edited"] and result["notes"]:
                     tmp_notes = result["notes"]
-            
+
             except Exception as e:
                 if "failed_generation" in str(e):
                     new_error: groq.BadRequestError = e
@@ -910,7 +910,7 @@ def send_email(email, email_type, **kwargs):
                 """
 
         subject = "Welcome to Amurex – We're Glad You're Here!"
-    
+
     elif email_type == "meeting_share":
         share_url = kwargs['share_url']
         owner_email = kwargs['owner_email']
@@ -967,7 +967,7 @@ def send_email(email, email_type, **kwargs):
                                             margin: 0 5px 0 0;
                                         "
                                         >
-                                            <img 
+                                            <img
                                                 src="https://www.amurex.ai/_next/image?url=%2F_next%2Fstatic%2Fmedia%2FAmurexLogo.56901b87.png&w=64&q=75"
                                                 alt="Amurex Logo"
                                                 style="
@@ -1103,7 +1103,7 @@ def send_email(email, email_type, **kwargs):
             .select("summary, action_items")\
             .eq("id", meeting_id)\
             .execute().data[0]
-        
+
         summary = result["summary"]
         action_items = result["action_items"]
 
@@ -1124,7 +1124,7 @@ def send_email(email, email_type, **kwargs):
                         >
                             Your notes are ready | Amurex
                         </div>
-                        
+
                         <body
                             style="
                             background-color: rgb(255, 255, 255);
@@ -1197,7 +1197,7 @@ def send_email(email, email_type, **kwargs):
                                                                         margin: 0 5px 0 0;
                                                                     "
                                                                     >
-                                                                        <img 
+                                                                        <img
                                                                             src="https://www.amurex.ai/_next/image?url=%2F_next%2Fstatic%2Fmedia%2FAmurexLogo.56901b87.png&w=64&q=75"
                                                                             alt="Amurex Logo"
                                                                             style="
@@ -1217,7 +1217,7 @@ def send_email(email, email_type, **kwargs):
                                                     </tr>
                                                 </tbody>
                                             </table>
-                                            
+
                                             <p
                                             style="
                                                 color: rgb(0, 0, 0);
@@ -1228,7 +1228,7 @@ def send_email(email, email_type, **kwargs):
                                             >
                                                 Hey 👋
                                             </p>
-                                            
+
                                             <p
                                             style="
                                                 color: rgb(0, 0, 0);
@@ -1287,7 +1287,7 @@ def send_email(email, email_type, **kwargs):
                                             >
                                                 Action Items
                                             </p>
-                                            
+
                                             <div style="
                                                 max-height: 130px;
                                                 overflow: hidden;
@@ -1331,7 +1331,7 @@ def send_email(email, email_type, **kwargs):
                                                             >
                                                                 For the full summary, access it in our web app:
                                                             </p>
-                                                            
+
                                                             <a
                                                             href="https://app.amurex.ai/meetings/{meeting_id}"
                                                             style="
@@ -1364,7 +1364,7 @@ def send_email(email, email_type, **kwargs):
                                                                     mso-text-raise: 9px;
                                                                     "
                                                                 >
-                                                                    
+
                                                                     View full summary
                                                                 </span>
                                                             </a>
@@ -1396,7 +1396,7 @@ def send_email(email, email_type, **kwargs):
                                                 margin: 16px 0;
                                                 "
                                             >
-                                                This invitation was intended for<!-- --> <span style="color: rgb(0, 0, 0)">{email}</span>. 
+                                                This invitation was intended for<!-- --> <span style="color: rgb(0, 0, 0)">{email}</span>.
                                                 If you were not expecting this invitation, you can ignore this email. If you are
                                                 concerned about your account&#x27;s safety, please get in touch with <a href="mailto:founders@thepersonalaicompany.com">founders@thepersonalaicompany.com</a>.
                                             </p>
@@ -1453,14 +1453,14 @@ def extract_text(file_path):
 def get_chunks(text):
     max_chars = 200
     overlap = 50
-    
+
     chunks = []
     start = 0
     while start < len(text):
         chunk = text[start:start + max_chars]
         chunks.append(chunk)
         start += max_chars - overlap
-    
+
     if start < len(text):
         chunks.append(text[start:])
 
@@ -1497,22 +1497,22 @@ async def upload_meeting_file(request):
         return Response(status_code=413, description="File size exceeds 20MB limit", headers={})
 
     logger.info(f"Processing file: {file_name}")
-    
+
     # Generate unique filename
     file_extension = file_name.split(".")[-1]
     unique_filename = f"{uuid.uuid4()}.{file_extension}"
-    
+
     # Read file contents
     file_contents = files[file_name]
-    
+
     # Upload to Supabase Storage
-    storage_response = supabase.storage.from_("meeting_context_files").upload(
+    storage_response = supabase.storage.from_("meeting-context-files").upload(
         unique_filename,
         file_contents
     )
-    
+
     # Get public URL for the uploaded file
-    file_url = supabase.storage.from_("meeting_context_files").get_public_url(unique_filename)
+    file_url = supabase.storage.from_("meeting-context-files").get_public_url(unique_filename)
 
 
     new_entry = supabase.table("meetings").upsert(
@@ -1539,7 +1539,7 @@ async def upload_meeting_file(request):
         .eq("meeting_id", meeting_id)\
         .eq("user_id", user_id)\
         .execute()
-    
+
     return {
         "status": "success",
         "file_url": file_url,
@@ -1596,15 +1596,15 @@ def create_memory_object(transcript):
     # Ensure notes_content is a string before generating title
     if isinstance(notes_content, list):
         notes_content = '\n'.join(notes_content)
-    
+
     title = generate_title(notes_content)
-    
+
     result = {
         "action_items": action_items,
         "notes_content": notes_content,
         "title": title
     }
-    
+
     return result
 
 @lru_cache(maxsize=1000)
@@ -1646,20 +1646,20 @@ async def end_meeting(request: Request, body: EndMeetingRequest):
             "notes_content": notes_content,
             "action_items": action_items
         }
-    
+
     if not meeting_id:
         # action_items = extract_action_items(transcript)
         # notes_content = generate_notes(transcript)
         res = generate_everything(transcript)
         notes_content = res["notes"]
         action_items = res["action_items"]
-        
+
         return {
             "notes_content": notes_content,
             "action_items": action_items
         }
-    
-    
+
+
     is_memory_enabled = check_memory_enabled(user_id)
 
     if not is_memory_enabled:
@@ -1704,7 +1704,7 @@ async def end_meeting(request: Request, body: EndMeetingRequest):
         }
     else:
         memory_obj = create_memory_object(transcript=transcript)
-        
+
         response = {
             "action_items": memory_obj["action_items"],
             "notes_content": memory_obj["notes_content"]
@@ -1721,32 +1721,32 @@ async def generate_actions(request, body: ActionRequest):
     data = json.loads(body)
     transcript = data["transcript"]
     cache_key = get_cache_key(transcript)
-    
+
     logger.info(f"Generating actions for transcript with cache key: {cache_key}")
-    
+
     # Try to get from cache
     cached_result = redis_client.get(cache_key)
     if cached_result:
         logger.info("Retrieved result from cache")
         return json.loads(cached_result)
-    
+
     logger.info("Cache miss - generating new results")
     # Generate new results if not in cache
     action_items = extract_action_items(transcript)
     notes_content = generate_notes(transcript)
-    
+
     result = {
         "action_items": action_items,
         "notes_content": notes_content
     }
-    
+
     # Cache the result
     redis_client.setex(
         cache_key,
         CACHE_EXPIRATION,
         json.dumps(result)
     )
-    
+
     return result
 
 
@@ -1755,7 +1755,7 @@ async def submit(request: Request, body: ActionItemsRequest):
     data = json.loads(body)
     action_items = data["action_items"]
     meeting_summary = data["meeting_summary"]
-    
+
     # notion_url = create_note(notes_content)
     emails = data["emails"]
     successful_emails = send_email_summary(emails, action_items, meeting_summary)
@@ -1765,7 +1765,7 @@ async def submit(request: Request, body: ActionItemsRequest):
             "successful_emails": None,
             "error": successful_emails["error"]
         }
-    
+
     return {"successful_emails": successful_emails["emails"]}
 
 class TrackingRequest(Body):
@@ -1832,7 +1832,7 @@ def generate_realtime_suggestion(context, transcript):
                 - They are struggling to answer a question
                 - They were asked a question that requires recalling something
                 - They need to recall something from their memory (e.g. 'what was the company you told us about 3 weeks ago?')
-                
+
                 You have to generate the most important suggestion or help for a user based on the information retrieved from user's memory and latest transcript chunk.
             """
         },
@@ -1841,7 +1841,7 @@ def generate_realtime_suggestion(context, transcript):
             "content": f"""
                 Information retrieved from user's memory: {context},
                 Latest chunk of the transcript: {transcript},
-                
+
 
                 Be super short. Just give some short facts or key words that could help your user to answer the question.
                 Do not use any intro words, like 'Here's the suggestion' etc.
@@ -1859,7 +1859,7 @@ def generate_realtime_suggestion(context, transcript):
     return response
 
 
-def check_suggestion(request_dict): 
+def check_suggestion(request_dict):
     try:
         transcript = request_dict["transcript"]
         meeting_id = request_dict["meeting_id"]
@@ -1876,7 +1876,7 @@ def check_suggestion(request_dict):
                     "last_question": None,
                     "type": "no_record_found"
                     }
-            
+
             sb_response = sb_response[0]
             if not sb_response["context_files"] or not sb_response["chunks"]:
                 return {
@@ -1894,7 +1894,7 @@ def check_suggestion(request_dict):
                     # "last_question": None,
                     # "type": "exceeded_response"
                 # }
-            
+
             file_chunks = sb_response["chunks"]
             embedded_chunks = sb_response["embeddings"]
             embedded_chunks = [parse_array_string(item) for item in embedded_chunks]
@@ -1902,18 +1902,18 @@ def check_suggestion(request_dict):
             messages_list = [
                 {
                     "role": "system",
-                    "content": """You are a personal online meeting copilot, and your task is to detect if a speaker needs help during a call. 
+                    "content": """You are a personal online meeting copilot, and your task is to detect if a speaker needs help during a call.
 
                         Possible cases when user needs help in real time:
                         - They need to recall something from their memory (e.g. 'what was the company you told us about 3 weeks ago?')
                         - They need to recall something from files or context they have prepared for the meeting (we are able handle the RAG across their documents)
 
                         If the user was not asked a question or is not trying to recall something, then they don't need any help or suggestions.
-                        
+
                         You have to identify if they need help based on the call transcript,
                         If your user has already answered the question, there is no need to help.
                         If the last sentence in the transcript was a question, then your user probably needs help. If it's not a question, then don't.
-                        
+
                         You are strictly required to follow this JSON structure:
                         {"needs_help":true/false, "last_question": json null or the last question}
                     """
@@ -1973,7 +1973,7 @@ def check_suggestion(request_dict):
                 }
 
 
-    
+
     except ValueError as e:
         return {"error": str(e)}
     except Exception as e:
@@ -2023,11 +2023,11 @@ async def on_connect(ws, msg):
     try:
         # Create meeting in SQLite if it doesn't exist
         db.create_meeting(meeting_id)
-        
+
         if user_id and user_id not in ("undefined", "null"):
             # Add connection to SQLite database
             db.add_connection(ws.id, meeting_id, user_id)
-            
+
             # Set as primary user if none exists
             if not db.get_primary_user(meeting_id):
                 db.set_primary_user(meeting_id, ws.id)
@@ -2075,7 +2075,7 @@ async def on_message(ws, msg):
                 meeting = db.get_meeting(meeting_id)
                 current_transcript = meeting.get('transcript', '') if meeting else ''
                 updated_transcript = current_transcript + data
-                
+
                 # Update transcript in database
                 db.update_transcript(meeting_id, updated_transcript)
                 logger.debug(f"Updated transcript for meeting {meeting_id}")
@@ -2107,14 +2107,14 @@ async def on_message(ws, msg):
 async def close(ws, msg):
     try:
         meeting_id = ws.query_params.get("meeting_id")
-        
+
         # Remove connection from database
         db.remove_connection(ws.id)
         logger.info(f"Closed connection for websocket {ws.id}")
-        
+
     except Exception as e:
         logger.error(f"Error in closing connection: {str(e)}", exc_info=True)
-    
+
     return ""
 
 
@@ -2183,13 +2183,13 @@ async def update_meeting_obj(request):
         unique_filename = f"{uuid.uuid4()}.txt"
         file_contents = transcript
         file_bytes = file_contents.encode('utf-8')
-        
+
         storage_response = supabase.storage.from_("transcripts").upload(
             path=unique_filename,
             file=file_bytes,
         )
         file_url = supabase.storage.from_("transcripts").get_public_url(unique_filename)
-        
+
         supabase_update_object["transcript"] = file_url
 
     result = supabase.table("late_meeting")\
@@ -2217,13 +2217,13 @@ async def store_transcript_file(transcript: str, meeting_obj_id: str):
     try:
         unique_filename = f"{uuid.uuid4()}.txt"
         file_bytes = transcript.encode('utf-8')
-        
+
         storage_response = supabase.storage.from_("transcripts").upload(
             path=unique_filename,
             file=file_bytes,
         )
         file_url = supabase.storage.from_("transcripts").get_public_url(unique_filename)
-        
+
         supabase.table("late_meeting")\
             .update({"transcript": file_url})\
             .eq("id", meeting_obj_id)\
@@ -2255,8 +2255,8 @@ def store_memory_data(memory_obj: dict, user_id: str, meeting_obj_id: str, pool:
 
         supabase.table("late_meeting")\
             .update({
-                "summary": memory_obj["notes_content"], 
-                "action_items": memory_obj["action_items"], 
+                "summary": memory_obj["notes_content"],
+                "action_items": memory_obj["action_items"],
                 "meeting_title": memory_obj["title"]
             })\
             .eq("id", meeting_obj_id)\
@@ -2265,7 +2265,7 @@ def store_memory_data(memory_obj: dict, user_id: str, meeting_obj_id: str, pool:
         # send email with the summary after the meeting ends
         user_email = supabase.table("users").select("email").eq("id", user_id).execute().data[0]["email"]
         emails_enabled = supabase.table("users").select("emails_enabled").eq("id", user_id).execute().data[0]["emails_enabled"]
-        
+
         email_already_sent = supabase.table("late_meeting").select("post_email_sent").eq("id", meeting_obj_id).execute().data[0]["post_email_sent"]
         if not email_already_sent and emails_enabled:
             send_email(email=user_email, email_type="post_meeting_summary", meeting_id=meeting_obj_id)
